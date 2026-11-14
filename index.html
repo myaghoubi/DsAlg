@@ -9,12 +9,6 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-
-  
-html{direction:rtl}html[dir=ltr]{direction:ltr}
-*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--primary) 55%,transparent) transparent}
-*:hover{scrollbar-color:color-mix(in srgb,var(--primary) 80%,transparent) transparent}
-  
 @font-face{font-family:"IRANSans";src:url(fonts/IRANSansWeb.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
 @font-face{font-family:"IRANSans";src:url(fonts/IRANSansWeb_Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
 @font-face{font-family:"IRANSans";src:url(fonts/IRANSansWeb_Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
@@ -22,23 +16,13 @@ html{direction:rtl}html[dir=ltr]{direction:ltr}
   --bg:#f3f5fa;--card:#fff;--tx:#1b2233;--mut:#667089;--bd:#dde3ee;
   --acc:#2563eb;--acc2:#7c3aed;--warn:#ea580c;--ok:#15803d;--err:#dc2626;
   --live:#dbeafe;--dead:#e5e7eb;--flash:#fde047;--node:#fff;--edge:#475569;
-  --codebg:#0f172a;--codetx:#e2e8f0;--codehl:rgba(37,99,235,.45);
+  --codebg:#0f172a;--codetx:#e2e8f0;--codehl:rgba(37,99,235,.45);--sb:rgba(102,112,137,.55);
   --fa:"IRANSans","Iran Sans",Tahoma,"Segoe UI",system-ui,sans-serif;
   --mono:ui-monospace,Menlo,Consolas,"Courier New","IRANSans",monospace;
-
-
-
-  
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#0b1020;--card:#151c30;--tx:#e6eaf5;--mut:#98a2bd;--bd:#27314c;
-    --live:#1e3a6e;--dead:#2a3350;--flash:#a16207;--node:#1c2540;--edge:#9aa6c4;--codebg:#070b17}
-
-  --bg:#0e1217;--bar:#151b23;--card:#1b232d;--card2:#26313e;--field:#10161d;--line:#34445a;--text:#e8eef5;--muted:#8fa1b3;
-  --primary:#4c9aff;--on-primary:#06121f;--ok:#34d399;--on-ok:#04130d;--warn:#fbbf24;--on-warn:#1a1204;--danger:#f87171;--on-danger:#2a0a0a;
-  --rowred:#4a1a20;--okbg:#15402f;--on:#06121f;
-  --shadow:0 1px 2px rgba(0,0,0,.4);
-  
+    --live:#1e3a6e;--dead:#2a3350;--flash:#a16207;--node:#1c2540;--edge:#9aa6c4;--codebg:#070b17;--sb:rgba(152,162,189,.5)}
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -47,6 +31,16 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fa);font-size:14px;l
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
 body.dragging{user-select:none;-webkit-user-select:none;cursor:col-resize}
 button,select,input{font:inherit;color:inherit}
+
+/* ---- اسکرول‌بارهای نازک، شفاف و خودکار‌پنهان ----
+   معمولاً نامرئی‌اند؛ هنگام اسکرول (کلاس sb-on از جاوااسکریپت) یا رفتن ماوس روی ناحیه ظاهر می‌شوند */
+*{scrollbar-width:thin;scrollbar-color:transparent transparent}
+body *:hover,.sb-on{scrollbar-color:var(--sb) transparent}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:6px}
+body *:hover::-webkit-scrollbar-thumb,.sb-on::-webkit-scrollbar-thumb{background:var(--sb)}
+pre.code{--sb:rgba(226,232,240,.42)}
 .app{min-height:100dvh;display:flex;flex-direction:column}
 
 /* ---- بالای صفحه ---- */
@@ -91,9 +85,10 @@ input[type=text]{width:64px;text-align:center;direction:ltr}
 .tabs button.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
 pre.code{margin:0;background:var(--codebg);color:var(--codetx);border-radius:10px;padding:6px 0;overflow-x:auto;direction:ltr;text-align:left;
   font-family:var(--mono);font-size:12.5px;line-height:1.75}
-.ln{display:block;padding:0 10px 0 0;white-space:pre;border-right:3px solid transparent;unicode-bidi:plaintext}
+.ln{display:block;min-width:100%;width:max-content;padding:0 10px 0 0;white-space:pre;border-right:3px solid transparent;unicode-bidi:plaintext}
 .ln i{display:inline-block;width:2em;text-align:right;color:#64748b;font-style:normal;margin-right:8px;user-select:none}
 .ln.cur{background:var(--codehl);border-right-color:#60a5fa}
+.iv{color:#5eead4;margin-left:18px;font-weight:600}
 .k{color:#c4b5fd}.s{color:#fca5a5}.n{color:#fcd34d}.c{color:#94a3b8}.f{color:#7dd3fc}
 details>summary{cursor:pointer;color:var(--mut);font-size:12px;margin:2px 0 4px}
 details pre.code{margin-bottom:6px}

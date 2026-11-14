@@ -260,7 +260,18 @@
     $('#codeTabs').innerHTML = list.map((o) => '<button data-op="' + o.id + '" class="' + (o.id === S.viewOp ? 'on' : '') + '">' + o.label + '</button>').join('');
     const op = list.find((o) => o.id === S.viewOp) || list[0];
     const active = (S.viewOp === S.runOp) && S.i >= 0 ? st.line : -999;
-    $('#code').innerHTML = op.lines.map((l, i) => '<span class="ln' + (i === active ? ' cur' : '') + '"><i>' + (i + 1) + '</i>' + hl(l) + '</span>').join('');
+    /* وقتی پنجره‌ی Watch جمع است، مقدار متغیرهای خط جاری روی نوار هایلایت نوشته می‌شود */
+    let iv = '';
+    if (active >= 0 && document.querySelector('.tracebox').classList.contains('collapsed')) {
+      const w = E.watch(st, key()), vals = Object.create(null), seen = new Set(), parts = [];
+      w.g.concat(w.l).forEach(([n, v]) => { vals[n] = v; });
+      (op.lines[active].replace(/#.*$/, '').match(/[A-Za-z_]\w*/g) || []).forEach((tk) => {
+        if (tk in vals && !seen.has(tk)) { seen.add(tk); parts.push(tk + '=' + vals[tk]); }
+      });
+      parts.sort((a, b) => (a.indexOf('=[') > 0 ? 1 : 0) - (b.indexOf('=[') > 0 ? 1 : 0)); /* آرایه‌ی بلند آخر بیاید */
+      if (parts.length) iv = '<span class="iv">▸ ' + esc(parts.join('   ')) + '</span>';
+    }
+    $('#code').innerHTML = op.lines.map((l, i) => '<span class="ln' + (i === active ? ' cur' : '') + '"><i>' + (i + 1) + '</i>' + hl(l) + (i === active ? iv : '') + '</span>').join('');
     $('#decl').innerHTML = E.decl(key(), S.N).split('\n').map(hl).join('\n');
   }
 
@@ -404,9 +415,19 @@
     const t = document.querySelector('.tracebox');
     t.classList.toggle('collapsed');
     $('#trTog').textContent = t.classList.contains('collapsed') ? '▸' : '▾';
+    renderCode(cur());
   }
   $('#trHead').addEventListener('click', toggleTrace);
   $('#trHead').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); toggleTrace(); } });
+
+  /* اسکرول‌بار فقط هنگام اسکرول دیده می‌شود */
+  document.addEventListener('scroll', (e) => {
+    const el = e.target === document ? document.documentElement : e.target;
+    if (!el || !el.classList) return;
+    el.classList.add('sb-on');
+    clearTimeout(el._sbT);
+    el._sbT = setTimeout(() => el.classList.remove('sb-on'), 900);
+  }, true);
 
   window.appToast = toast;
   reset();
