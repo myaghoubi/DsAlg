@@ -58,7 +58,7 @@ input[type=text]{width:64px;text-align:center;direction:ltr}
 
 /* ---- ناحیه‌ی اصلی ---- */
 .main{display:flex;flex-direction:column;gap:6px;margin:6px 10px 0}
-.pane-gfx{display:contents}
+.pane-gfx,.left{display:contents}
 .stage{order:1;padding:6px}
 .pane-code{order:2}
 .tracebox{order:3;max-height:280px;display:flex;flex-direction:column;padding:6px}
@@ -87,13 +87,13 @@ details pre.code{margin-bottom:6px}
 .tracebox.collapsed .trlist{display:none}
 .tracebox.collapsed .trhead{padding-bottom:0}
 .trlist{overflow:auto;position:relative;direction:ltr;flex:1;min-height:0;max-height:230px;border-top:1px solid var(--bd)}
-.tr{display:grid;grid-template-columns:28px minmax(150px,32%) 1fr;gap:8px;padding:3px 8px;border-bottom:1px dashed var(--bd);font-size:12.5px;align-items:baseline;min-width:520px}
+.tr{display:grid;grid-template-columns:24px 1fr;gap:0 8px;padding:3px 8px;border-bottom:1px dashed var(--bd);font-size:12.5px;align-items:baseline}
 .tr>span:first-child{color:var(--mut);text-align:right}
 .tr code{font-family:var(--mono);white-space:pre;overflow:hidden;text-overflow:ellipsis}
 .tr.th{position:sticky;top:0;background:var(--card);z-index:1;color:var(--mut);font-size:11.5px;font-weight:700;border-bottom:1px solid var(--bd)}
 .tr.th span{unicode-bidi:plaintext;text-align:left}
 .tr.cur{background:rgba(37,99,235,.13);font-weight:500}
-.wvs{display:flex;flex-wrap:wrap;gap:3px 10px;font-family:var(--mono)}
+.wvs{grid-column:2;display:flex;flex-wrap:wrap;gap:1px 8px;font-family:var(--mono);font-size:12px}
 .wv{white-space:nowrap;padding:0 4px;border-radius:5px}
 .wv b{color:var(--acc2)}
 .wv.ch{background:rgba(250,204,21,.38)}
@@ -115,14 +115,16 @@ details pre.code{margin-bottom:6px}
   h1 small{display:none}
   .tools{grid-template-columns:1fr 1fr}
   .main{flex:1 1 0;min-height:0;flex-direction:row;direction:ltr;gap:0;margin-top:6px}
-  .pane-code{order:0;flex:0 0 calc(var(--cw,30%) - 6px);min-width:0;overflow:auto;padding:8px}
+  .left{display:flex;flex-direction:column;flex:0 0 calc(var(--cw,30%) - 6px);min-width:0;gap:6px}
+  .pane-code{order:0;flex:1 1 0;min-width:0;min-height:60px;overflow:auto;padding:8px}
   .handle{display:block;flex:0 0 12px;position:relative;cursor:col-resize;touch-action:none;border-radius:6px}
   .handle::before{content:"";position:absolute;top:8%;bottom:8%;left:50%;width:4px;margin-left:-2px;border-radius:3px;background:var(--bd);transition:background .15s}
   .handle:hover::before,.handle:focus-visible::before,body.dragging .handle::before{background:var(--acc)}
   .handle:focus{outline:none}
   .pane-gfx{display:flex;flex-direction:column;flex:1 1 0;min-width:0;direction:rtl;gap:6px}
   .stage{order:0;flex:1 1 0;min-height:0;overflow:auto}
-  .tracebox{order:0;flex:0 0 36%;min-height:96px;max-height:none}
+  .tracebox{order:0;flex:0 0 46%;min-height:96px;max-height:none}
+  .trhead .legend{display:none}
   .trlist{max-height:none}
   .tracebox.collapsed{flex:0 0 auto;min-height:0}
   .bar{margin-top:6px;flex-wrap:nowrap;box-shadow:none}
@@ -145,7 +147,7 @@ details pre.code{margin-bottom:6px}
   .seg button,.btn{padding-left:7px;padding-right:7px}
   .main{margin-top:4px}
   .stage{min-height:110px}
-  .tracebox{flex-basis:32%;min-height:80px}
+  .tracebox{flex-basis:44%;min-height:80px}
   .bar{padding-top:3px;padding-bottom:3px;margin-top:4px}
   .note{min-height:24px;font-size:12px;padding-top:0;padding-bottom:0}
   .btns .btn{padding-left:6px;padding-right:6px}
@@ -228,12 +230,18 @@ svg text{font-family:var(--fa)}
   </section>
 
   <main class="main" id="main">
+    <div class="left" id="paneLeft">
     <section class="card pane-code" id="paneCode">
       <div class="tabs" id="codeTabs"></div>
       <details id="declBox"><summary>تعریف ساختار داده</summary><pre class="code" id="decl"></pre></details>
       <pre class="code" id="code"></pre>
       <div class="legend">متغیرهای سراسری برای سادگی بدون <code>global</code> نوشته شده‌اند. خط هایلایت‌شده «همین الان اجرا شد» و تصویر، نتیجه‌ی آن است.</div>
     </section>
+    <section class="card tracebox">
+      <div class="trhead" id="trHead" role="button" tabindex="0" title="باز و بسته کردن"><b><span id="trTog">▾</span> Trace و Watch</b><span class="legend">هر خط: دستور اجراشده + مقدار متغیرها بعد از آن · متغیر تغییرکرده زرد است</span></div>
+      <div class="trlist" id="trace"></div>
+    </section>
+    </div>
 
     <div class="handle" id="handle" role="separator" aria-orientation="vertical" tabindex="0"
          aria-label="تغییر عرض ناحیه‌ی کد و ناحیه‌ی گرافیکی (دوبار کلیک: بازگشت به ۳۰٪)" aria-valuemin="15" aria-valuemax="60" aria-valuenow="30"></div>
@@ -244,10 +252,6 @@ svg text{font-family:var(--fa)}
         <div class="scroll"><div id="draw"></div></div>
         <div id="ringWrap"></div>
         <div class="legend" id="legend"></div>
-      </section>
-      <section class="card tracebox">
-        <div class="trhead" id="trHead" role="button" tabindex="0" title="باز و بسته کردن"><b><span id="trTog">▾</span> Trace و Watch</b><span class="legend">هر خط: دستور اجراشده + مقدار متغیرها بعد از آن · متغیر تغییرکرده زرد است</span></div>
-        <div class="trlist" id="trace"></div>
       </section>
     </div>
   </main>

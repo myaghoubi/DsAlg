@@ -276,7 +276,7 @@
   function renderTrace() {
     const box = $('#trace');
     const base = idleStep();
-    let h = '<div class="tr th"><span>#</span><span>Trace — دستور اجراشده</span><span>Watch — متغیرها پس از اجرا</span></div>';
+    let h = '<div class="tr th"><span>#</span><span>Trace ← Watch</span></div>';
     h += '<div class="tr' + (S.i < 0 ? ' cur' : '') + '"><span>0</span><code>initial state</code><span class="wvs">' + wvHTML(base, base, false) + '</span></div>';
     if (S.steps.length) {
       const op = ops().find((o) => o.id === S.runOp);
