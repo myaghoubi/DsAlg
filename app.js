@@ -264,28 +264,31 @@
     $('#decl').innerHTML = E.decl(key(), S.N).split('\n').map(hl).join('\n');
   }
 
-  function renderWatch(st, pv) {
-    const a = E.watch(st, key()), p = E.watch(pv, key());
-    const pm = {}; p.g.concat(p.l).forEach(([n, v]) => { pm[n] = v; });
-    const rows = (arr) => arr.length
-      ? '<tr><th>اسم</th><th>مقدار</th></tr>' + arr.map(([n, v]) => '<tr' + (!st.idle && pm[n] !== v ? ' class="ch"' : '') + '><td>' + n + '</td><td>' + esc(v) + '</td></tr>').join('')
-      : '<tr><td colspan="2" style="color:var(--mut);font-weight:400">— (خارج از اجرای تابع، متغیر محلی وجود ندارد)</td></tr>';
-    $('#wG').innerHTML = rows(a.g);
-    $('#wL').innerHTML = rows(a.l);
+  /* مقدار متغیرها (Watch) به‌صورت فشرده؛ متغیر تغییرکرده نسبت به گام قبل زرد می‌شود */
+  function wvHTML(step, prevStep, mark) {
+    const k = key();
+    const a = E.watch(step, k), p = E.watch(prevStep, k), pm = {};
+    p.g.concat(p.l).forEach(([n, v]) => { pm[n] = v; });
+    return a.g.concat(a.l).filter(([n]) => n !== 'N')
+      .map(([n, v]) => '<span class="wv' + (mark && pm[n] !== v ? ' ch' : '') + '"><b>' + n + '</b>=' + esc(v) + '</span>').join('');
   }
 
   function renderTrace() {
-    const ol = $('#trace');
-    if (!S.steps.length) { ol.innerHTML = '<li><span>هنوز عملیاتی اجرا نشده است.</span></li>'; return; }
-    const op = ops().find((o) => o.id === S.runOp);
-    let h = '';
-    for (let k = 0; k <= S.i; k++) {
-      const s = S.steps[k];
-      const code = s.line < 0 ? '— پایان تابع' : (s.line + 1) + ':  ' + op.lines[s.line].trim();
-      h += '<li class="' + (k === S.i ? 'cur' : '') + '"><code>' + esc(code) + '</code><span>' + esc(s.note) + '</span></li>';
+    const box = $('#trace');
+    const base = idleStep();
+    let h = '<div class="tr th"><span>#</span><span>Trace — دستور اجراشده</span><span>Watch — متغیرها پس از اجرا</span></div>';
+    h += '<div class="tr' + (S.i < 0 ? ' cur' : '') + '"><span>0</span><code>initial state</code><span class="wvs">' + wvHTML(base, base, false) + '</span></div>';
+    if (S.steps.length) {
+      const op = ops().find((o) => o.id === S.runOp);
+      for (let j = 0; j <= S.i; j++) {
+        const s = S.steps[j], pv = j > 0 ? S.steps[j - 1] : base;
+        const code = s.line < 0 ? '— end of function' : (s.line + 1) + ':  ' + op.lines[s.line].replace(/\s*#.*$/, '').trim();
+        h += '<div class="tr' + (j === S.i ? ' cur' : '') + '"><span>' + (j + 1) + '</span><code>' + esc(code) + '</code><span class="wvs">' + wvHTML(s, pv, true) + '</span></div>';
+      }
     }
-    ol.innerHTML = h;
-    const c = ol.querySelector('.cur'); if (c) c.scrollIntoView({ block: 'nearest' });
+    box.innerHTML = h;
+    const c = box.querySelector('.cur');
+    if (c) box.scrollTop = Math.max(0, c.offsetTop - box.clientHeight + c.offsetHeight + 6);
   }
 
   function renderCtrl() {
@@ -314,7 +317,7 @@
 
   function render() {
     const st = cur(), pv = prev();
-    renderModes(); renderStage(st, pv); renderCode(st); renderWatch(st, pv); renderTrace(); renderCtrl();
+    renderModes(); renderStage(st, pv); renderCode(st); renderTrace(); renderCtrl();
   }
 
   /* ---------- رویدادها ---------- */
@@ -361,9 +364,50 @@
     if (!deferred) return;
     deferred.prompt(); await deferred.userChoice; deferred = null; $('#installBtn').hidden = true;
   });
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
-  }
 
+  /* ---------- دستگیره‌ی تغییر عرض کد / گرافیک (حالت افقی) ---------- */
+  const mainEl = $('#main'), handle = $('#handle');
+  function setCW(p, save) {
+    p = Math.min(60, Math.max(15, p));
+    mainEl.style.setProperty('--cw', p + '%');
+    handle.setAttribute('aria-valuenow', String(Math.round(p)));
+    S.cw = p;
+    if (save) { try { localStorage.setItem('ds_cw', String(p)); } catch (e) { /* ignore */ } }
+  }
+  let saved = NaN;
+  try { saved = parseFloat(localStorage.getItem('ds_cw')); } catch (e) { /* ignore */ }
+  setCW(saved >= 15 && saved <= 60 ? saved : 30, false);
+  let dragging = false;
+  handle.addEventListener('pointerdown', (e) => {
+    dragging = true; document.body.classList.add('dragging');
+    if (handle.setPointerCapture) { try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const r = mainEl.getBoundingClientRect();
+    setCW((e.clientX - r.left) / r.width * 100, false);
+  });
+  const endDrag = () => { if (!dragging) return; dragging = false; document.body.classList.remove('dragging'); setCW(S.cw, true); };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+  handle.addEventListener('dblclick', () => setCW(30, true));
+  handle.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault(); e.stopPropagation();
+      setCW(S.cw + (e.key === 'ArrowRight' ? 2 : -2), true);
+    }
+  });
+
+  /* ---------- جمع/باز کردن ناحیه‌ی Trace ---------- */
+  function toggleTrace() {
+    const t = document.querySelector('.tracebox');
+    t.classList.toggle('collapsed');
+    $('#trTog').textContent = t.classList.contains('collapsed') ? '▸' : '▾';
+  }
+  $('#trHead').addEventListener('click', toggleTrace);
+  $('#trHead').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); toggleTrace(); } });
+
+  window.appToast = toast;
   reset();
 })();

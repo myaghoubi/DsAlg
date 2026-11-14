@@ -1,9 +1,23 @@
-/* Service worker: کش کردن پوسته‌ی برنامه برای کار آفلاین */
-const CACHE = 'ds-visualizer-v1';
-const FILES = ['./', 'index.html', 'engine.js', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+/* Service worker — کش آفلاین + بروزرسانی نسخه‌دار
+   شماره‌ی نسخه از version.js می‌آید. مرورگر محتوای فایل‌های importScripts را هم برای تشخیص
+   تغییر بررسی می‌کند؛ پس عوض‌شدن شماره‌ی نسخه یک service worker جدید می‌سازد. */
+importScripts('version.js');
+
+const CACHE = 'ds-visualizer-v' + self.APP_VERSION;
+const FILES = [
+  './', 'index.html', 'version.js', 'engine.js', 'app.js', 'update.js',
+  'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+  'fonts/IRANSansWeb.woff2', 'fonts/IRANSansWeb_Medium.woff2', 'fonts/IRANSansWeb_Bold.woff2'
+];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  /* cache:'reload' یعنی حتماً از شبکه، نه از کش HTTP مرورگر */
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(FILES.map((f) =>
+    fetch(new Request(f, { cache: 'reload' })).then((r) => {
+      if (!r.ok) throw new Error('precache failed: ' + f);
+      return c.put(f, r);
+    })
+  ))));
 });
 
 self.addEventListener('activate', (e) => {
@@ -13,13 +27,21 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/* صفحه پس از دانلود کامل نسخه‌ی جدید، فعال‌سازی را درخواست می‌کند */
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  /* درخواست‌های بررسی نسخه (?_=...) همیشه مستقیم از شبکه می‌روند */
+  if (url.origin !== location.origin || url.searchParams.has('_')) return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy));
+    caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok) c.put(req, res.clone());
       return res;
-    }).catch(() => caches.match('index.html')))
+    }).catch(() => c.match('index.html'))))
   );
 });
