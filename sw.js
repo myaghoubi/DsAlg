@@ -11,12 +11,20 @@ const FILES = [
   'fonts/IRANSansWeb.woff2', 'fonts/IRANSansWeb_Medium.woff2', 'fonts/IRANSansWeb_Bold.woff2'
 ];
 
+/* گزارش پیشرفت دانلود فایل‌ها به صفحه (برای نوار پیشرفت روی دکمه‌ی بروزرسانی) */
+async function report(done, total) {
+  const cs = await self.clients.matchAll({ includeUncontrolled: true });
+  cs.forEach((c) => c.postMessage({ type: 'PROGRESS', done, total, version: self.APP_VERSION }));
+}
+
 self.addEventListener('install', (e) => {
+  let done = 0;
+  report(0, FILES.length);
   /* cache:'reload' یعنی حتماً از شبکه، نه از کش HTTP مرورگر */
   e.waitUntil(caches.open(CACHE).then((c) => Promise.all(FILES.map((f) =>
     fetch(new Request(f, { cache: 'reload' })).then((r) => {
       if (!r.ok) throw new Error('precache failed: ' + f);
-      return c.put(f, r);
+      return c.put(f, r).then(() => report(++done, FILES.length));
     })
   ))));
 });

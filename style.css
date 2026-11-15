@@ -50,8 +50,10 @@ h1 small{display:block;font-size:11px;color:var(--mut);font-weight:400}
 .seg button:disabled,.btn:disabled{opacity:.4;cursor:not-allowed}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
 .btn.sec{background:var(--acc2);border-color:var(--acc2);color:#fff}
-.btn.hot{background:var(--warn);border-color:var(--warn);color:#fff;animation:pulse 1.4s infinite}
-@keyframes pulse{50%{opacity:.65}}
+.btn.hot{--rem:100;border-color:var(--warn);color:var(--tx);font-weight:700;
+  background:linear-gradient(var(--warn),var(--warn)) right center/calc(var(--rem)*1%) 100% no-repeat,var(--card);
+  transition:background-size .25s ease}
+.btn.hot:disabled{opacity:1}
 select,input[type=text]{border:1px solid var(--bd);background:var(--card);padding:1px 8px;border-radius:9px;font-size:13px}
 input[type=text]{width:64px;text-align:center;direction:ltr}
 #capRow{display:inline-flex;align-items:center;gap:6px}

@@ -101,7 +101,19 @@
 
   updBtn.addEventListener('click', () => check(true));
 
+  /* پیشرفت دانلود: رنگ زمینه‌ی دکمه به نسبت فایل‌های باقی‌مانده کم می‌شود */
+  function setProgress(done, total) {
+    const rem = Math.max(0, Math.round(100 * (1 - done / total)));
+    updBtn.classList.add('hot');
+    updBtn.style.setProperty('--rem', rem);
+    updBtn.title = 'در حال دانلود نسخه‌ی جدید — ' + (100 - rem) + '٪';
+  }
+
   if (hasSW) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      const d = e.data;
+      if (d && d.type === 'PROGRESS' && String(d.version) !== APP_VERSION) setProgress(d.done, d.total);
+    });
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!controlled) { controlled = true; return; } /* نصب اولیه (claim)، نه بروزرسانی */
       reload();
