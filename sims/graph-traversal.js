@@ -205,7 +205,7 @@ const CSS = `
 @media (prefers-color-scheme:dark){:root{--g-disc:#7c5a10;--g-done:#14532d}}
 .gstage{display:flex;flex-direction:column;gap:6px;height:100%}
 .gsvg{flex:0 0 min(62vw,340px);min-height:0}
-.gsvg svg{width:100%;height:100%;display:block}
+.gsvg svg{width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none}
 @media (orientation:landscape) and (min-width:640px){.gsvg{flex:1 1 0;min-height:150px}}
 .gedge{fill:none;stroke:var(--edge);stroke-width:2.2}
 .gedge.tree{stroke:var(--ok);stroke-width:3.8}
@@ -219,6 +219,8 @@ const CSS = `
 .gnode.cur circle.c{fill:var(--acc);stroke:var(--acc);stroke-width:3}
 .gnode.cur text.lbl{fill:#fff}
 .gnode.sel circle.c{stroke:var(--acc2);stroke-width:5;stroke-dasharray:6 4}
+.grub{stroke:var(--acc);stroke-width:4;stroke-dasharray:3 6;stroke-linecap:round;pointer-events:none}
+.gnode.tgt circle.c{stroke:var(--ok);stroke-width:6}
 .gnode.chg circle.c{animation:gpulse .9s ease-out}
 @keyframes gpulse{0%{stroke-width:9}100%{}}
 .gnode .badge circle{fill:var(--acc2)}
@@ -278,7 +280,7 @@ const HTML = `
         <button class="btn" id="btnLayout" title="بازگرداندن راس‌ها به جای اولیه">چیدمان اولیه</button>
       </div>
       <div class="row">
-        <button class="btn" id="btnEdit" title="با زدن روی دو راس، یال بین آن‌ها اضافه یا حذف می‌شود">✎ ویرایش یال‌ها</button>
+        <button class="btn" id="btnEdit" title="کشیدن از یک راس به راس دیگر (یا زدن روی دو راس) یال را اضافه/حذف می‌کند">✎ ویرایش یال‌ها</button>
         <button class="btn" id="btnAddV">＋ راس جدید</button>
         <button class="btn" id="btnDelV" disabled>حذف راس انتخابی</button>
       </div>
@@ -481,29 +483,25 @@ function mount(view) {
     const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
   };
-  const held = new Map();      /* pointerId → id راسی که انگشت روی آن است (لمس) */
-  const muted = new Set();     /* انگشت‌هایی که بخشی از ژست دو‌انگشتی بوده‌اند */
+  /* حالت عادی: کشیدن راس = جابه‌جایی.
+     حالت ویرایش: کشیدن از یک راس تا راس دیگر = اضافه/حذف یال (خط کشسان)؛ ضربه روی دو راس هم کار می‌کند. */
+  let rub = null;
+  const nodeAt = (p, skip) => {
+    let best = null, bd = R + 16;                 /* تلورانس برای انگشت */
+    S.graph.nodes.forEach((n) => { const d = Math.hypot(n.x - p.x, n.y - p.y); if (n.id !== skip && d < bd) { bd = d; best = n; } });
+    return best;
+  };
+  const clearRub = () => {
+    if (rub && rub.line) rub.line.remove();
+    rub = null;
+    view.querySelectorAll('.gnode.tgt').forEach((g) => g.classList.remove('tgt'));
+  };
   svg.addEventListener('pointerdown', (e) => {
     const g = e.target.closest ? e.target.closest('.gnode') : null;
-    if (!g) return;
+    if (!g || drag) return;
     const n = N(g.dataset.id), p = toSvg(e);
     try { svg.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     e.preventDefault();
-    if (e.pointerType === 'touch') {
-      /* حالت ویرایش: دو انگشت هم‌زمان روی دو راس ← اضافه/حذف یال بین آن‌ها */
-      if (S.edit) {
-        for (const [pid, other] of held) {
-          if (other !== n.id && !muted.has(pid)) {
-            muted.add(pid); muted.add(e.pointerId); held.set(e.pointerId, n.id);
-            drag = null;
-            toggleEdge(other, n.id); S.sel = null; recompute(true);
-            return;
-          }
-        }
-      }
-      held.set(e.pointerId, n.id);
-    }
-    if (drag) return;                              /* انگشت دوم روی همان راس یا حالت عادی */
     drag = { id: n.id, pid: e.pointerId, dx: n.x - p.x, dy: n.y - p.y, sx: e.clientX, sy: e.clientY, moved: false };
   });
   svg.addEventListener('pointermove', (e) => {
@@ -511,19 +509,30 @@ function mount(view) {
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) drag.moved = true;
     if (!drag.moved) return;
     const p = toSvg(e), n = N(drag.id);
+    if (S.edit) {
+      if (!rub) { rub = { line: mk('line', { class: 'grub' }, svg) }; }
+      rub.line.setAttribute('x1', n.x); rub.line.setAttribute('y1', n.y);
+      rub.line.setAttribute('x2', p.x); rub.line.setAttribute('y2', p.y);
+      const t = nodeAt(p, n.id);
+      Object.keys(nodeEls).forEach((id) => nodeEls[id].g.classList.toggle('tgt', !!t && t.id === id));
+      return;
+    }
     n.x = Math.max(R + 2, Math.min(VW - R - 2, p.x + drag.dx));
     n.y = Math.max(R + 2, Math.min(VH - R - 2, p.y + drag.dy));
     layout();
   });
   const endDrag = (e) => {
-    held.delete(e.pointerId);
-    if (muted.delete(e.pointerId)) { if (drag && drag.pid === e.pointerId) drag = null; return; }
     if (!drag || drag.pid !== e.pointerId) return;
     const d = drag; drag = null;
-    if (!d.moved) onNodeClick(d.id);
+    if (!d.moved) { onNodeClick(d.id); return; }
+    if (S.edit) {
+      const t = nodeAt(toSvg(e), d.id);
+      clearRub();
+      if (t) { toggleEdge(d.id, t.id); S.sel = null; recompute(true); }
+    }
   };
   svg.addEventListener('pointerup', endDrag);
-  svg.addEventListener('pointercancel', (e) => { held.delete(e.pointerId); muted.delete(e.pointerId); if (drag && drag.pid === e.pointerId) drag = null; });
+  svg.addEventListener('pointercancel', (e) => { if (drag && drag.pid === e.pointerId) drag = null; clearRub(); });
 
   /* ----- رویدادهای ابزارها ----- */
   $('#preset').innerHTML = PRESETS.map((p, i) => '<option value="' + i + '">' + p.name + '</option>').join('');
@@ -544,7 +553,7 @@ function mount(view) {
   $('#btnEdit').addEventListener('click', () => {
     S.edit = !S.edit; S.sel = null;
     $('#btnEdit').classList.toggle('pri', S.edit);
-    if (S.edit) toast('حالت ویرایش: هم‌زمان با دو انگشت روی دو راس بزنید (یا روی یک راس و سپس راس دیگر) تا یال بین آن‌ها اضافه یا حذف شود.');
+    if (S.edit) toast('حالت ویرایش: انگشت را از یک راس تا راس دیگر بکشید (یا روی دو راس پشت‌سرهم بزنید) تا یال اضافه یا حذف شود. برای جابه‌جایی راس‌ها، ویرایش را خاموش کنید.');
     recompute(false);
   });
   $('#btnAddV').addEventListener('click', addVertex);
