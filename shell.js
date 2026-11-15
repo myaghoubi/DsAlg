@@ -14,6 +14,12 @@
         { id: 'stack-queue', title: 'شبیه‌ساز صف و پشته', file: 'sims/stack-queue.js' },
         { id: 'graph-traversal', title: 'شبیه‌ساز پیمایش عمقی و سطحی گراف (DFS / BFS)', file: 'sims/graph-traversal.js', deps: ['lib/stepper.js'] }
       ]
+    },
+    {
+      title: 'درباره‌ی برنامه', icon: 'ℹ️', open: true,
+      items: [
+        { id: 'changelog', title: 'سابقه‌ی بروزرسانی‌ها', file: 'sims/changelog.js' }
+      ]
     }
   ];
   const DEFAULT_ID = 'stack-queue';
