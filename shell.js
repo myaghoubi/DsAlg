@@ -16,6 +16,13 @@
       ]
     },
     {
+      title: 'نظریه‌ی زبان‌ها و ماشین‌ها', icon: '⚙️', open: true,
+      items: [
+        { id: 'pda', title: 'شبیه‌ساز ماشین پشته‌ای (PDA)', file: 'sims/pda.js', deps: ['lib/automata.js'] },
+        { id: 'turing', title: 'شبیه‌ساز ماشین تورینگ', file: 'sims/turing.js', deps: ['lib/automata.js'] }
+      ]
+    },
+    {
       title: 'درباره‌ی برنامه', icon: 'ℹ️', open: true,
       items: [
         { id: 'changelog', title: 'سابقه‌ی بروزرسانی‌ها', file: 'sims/changelog.js' }
