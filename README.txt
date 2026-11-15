@@ -1,4 +1,4 @@
-تغییرات نسخه ۲.۱ — شبیه‌ساز درخت AVL
-فایل جدید (اضافه کنید):  sims/avl.js
-فایل‌های تغییرکرده (جایگزین کنید):  shell.js  sw.js  version.js  sims/changelog.js
-حذف: چیزی حذف نمی‌شود. (lib/stepper.js از نسخه ۱.۵ موجود است.)
+تغییرات نسخه ۲.۲ — اسکرول نرم سطر جاری Trace
+فایل‌های تغییرکرده (جایگزین کنید):
+  lib/stepper.js  lib/automata.js  sims/stack-queue.js  sims/changelog.js  version.js
+حذف: چیزی حذف نمی‌شود. ساختار پوشه‌ها را حفظ کنید.
