@@ -481,16 +481,33 @@ function mount(view) {
     const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
   };
+  const held = new Map();      /* pointerId → id راسی که انگشت روی آن است (لمس) */
+  const muted = new Set();     /* انگشت‌هایی که بخشی از ژست دو‌انگشتی بوده‌اند */
   svg.addEventListener('pointerdown', (e) => {
     const g = e.target.closest ? e.target.closest('.gnode') : null;
     if (!g) return;
     const n = N(g.dataset.id), p = toSvg(e);
-    drag = { id: n.id, dx: n.x - p.x, dy: n.y - p.y, sx: e.clientX, sy: e.clientY, moved: false };
     try { svg.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     e.preventDefault();
+    if (e.pointerType === 'touch') {
+      /* حالت ویرایش: دو انگشت هم‌زمان روی دو راس ← اضافه/حذف یال بین آن‌ها */
+      if (S.edit) {
+        for (const [pid, other] of held) {
+          if (other !== n.id && !muted.has(pid)) {
+            muted.add(pid); muted.add(e.pointerId); held.set(e.pointerId, n.id);
+            drag = null;
+            toggleEdge(other, n.id); S.sel = null; recompute(true);
+            return;
+          }
+        }
+      }
+      held.set(e.pointerId, n.id);
+    }
+    if (drag) return;                              /* انگشت دوم روی همان راس یا حالت عادی */
+    drag = { id: n.id, pid: e.pointerId, dx: n.x - p.x, dy: n.y - p.y, sx: e.clientX, sy: e.clientY, moved: false };
   });
   svg.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pid) return;
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) drag.moved = true;
     if (!drag.moved) return;
     const p = toSvg(e), n = N(drag.id);
@@ -498,13 +515,15 @@ function mount(view) {
     n.y = Math.max(R + 2, Math.min(VH - R - 2, p.y + drag.dy));
     layout();
   });
-  const endDrag = () => {
-    if (!drag) return;
+  const endDrag = (e) => {
+    held.delete(e.pointerId);
+    if (muted.delete(e.pointerId)) { if (drag && drag.pid === e.pointerId) drag = null; return; }
+    if (!drag || drag.pid !== e.pointerId) return;
     const d = drag; drag = null;
     if (!d.moved) onNodeClick(d.id);
   };
   svg.addEventListener('pointerup', endDrag);
-  svg.addEventListener('pointercancel', () => { drag = null; });
+  svg.addEventListener('pointercancel', (e) => { held.delete(e.pointerId); muted.delete(e.pointerId); if (drag && drag.pid === e.pointerId) drag = null; });
 
   /* ----- رویدادهای ابزارها ----- */
   $('#preset').innerHTML = PRESETS.map((p, i) => '<option value="' + i + '">' + p.name + '</option>').join('');
@@ -525,7 +544,7 @@ function mount(view) {
   $('#btnEdit').addEventListener('click', () => {
     S.edit = !S.edit; S.sel = null;
     $('#btnEdit').classList.toggle('pri', S.edit);
-    if (S.edit) toast('حالت ویرایش: روی یک راس و سپس راس دیگر بزنید تا یال بین آن‌ها اضافه یا حذف شود.');
+    if (S.edit) toast('حالت ویرایش: هم‌زمان با دو انگشت روی دو راس بزنید (یا روی یک راس و سپس راس دیگر) تا یال بین آن‌ها اضافه یا حذف شود.');
     recompute(false);
   });
   $('#btnAddV').addEventListener('click', addVertex);
