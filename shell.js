@@ -142,7 +142,7 @@
     teardown();
     view.innerHTML = '<div class="loading">در حال بارگذاری…</div>';
     try {
-      if (!sims[id]) { for (const d of (item.deps || [])) await loadScript(d); await loadScript(item.file); }
+      if (!sims[id]) { await loadScript('lib/follow.js'); for (const d of (item.deps || [])) await loadScript(d); await loadScript(item.file); }
       if (!sims[id]) throw new Error('not registered');
     } catch (e) {
       if (my === seq) view.innerHTML = '<div class="loading err">بارگذاری این شبیه‌ساز ممکن نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.</div>';

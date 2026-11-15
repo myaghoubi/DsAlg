@@ -84,6 +84,8 @@ pre.code{margin:0;background:var(--codebg);color:var(--codetx);border-radius:10p
 .k{color:#c4b5fd}.s{color:#fca5a5}.n{color:#fcd34d}.c{color:#94a3b8}.f{color:#7dd3fc}
 details>summary{cursor:pointer;color:var(--mut);font-size:12px;margin:2px 0 4px}
 details pre.code{margin-bottom:6px}
+/* حالت عمودی: کد بلند در کادر خودش اسکرول می‌شود (تا اسکرول صفحه، تصویر را جابه‌جا نکند) */
+pre#code{max-height:46vh;overflow-y:auto}
 
 /* ---- Trace + Watch در یک خط ---- */
 .trhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:0 4px 4px;font-size:13px;cursor:pointer;user-select:none}
@@ -119,6 +121,7 @@ details pre.code{margin-bottom:6px}
   .tools{grid-template-columns:1fr 1fr}
   .main{flex:1 1 0;min-height:0;flex-direction:row;direction:ltr;gap:0;margin-top:6px}
   .left{display:flex;flex-direction:column;flex:0 0 calc(var(--cw,30%) - 6px);min-width:0;gap:6px}
+  pre#code{max-height:none;overflow-y:visible}
   .pane-code{order:0;flex:1 1 0;min-width:0;min-height:60px;overflow:auto;padding:8px}
   .handle{display:block;flex:0 0 12px;position:relative;cursor:col-resize;touch-action:none;border-radius:6px}
   .handle::before{content:"";position:absolute;top:8%;bottom:8%;left:50%;width:4px;margin-left:-2px;border-radius:3px;background:var(--bd);transition:background .15s}
