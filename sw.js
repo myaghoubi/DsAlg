@@ -6,7 +6,7 @@ importScripts('version.js');
 const CACHE = 'ds-visualizer-v' + self.APP_VERSION;
 const FILES = [
   './', 'index.html', 'style.css', 'version.js', 'shell.js', 'update.js',
-  'sims/stack-queue.js',
+  'lib/stepper.js', 'sims/stack-queue.js', 'sims/graph-traversal.js',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'fonts/IRANSansWeb.woff2', 'fonts/IRANSansWeb_Medium.woff2', 'fonts/IRANSansWeb_Bold.woff2'
 ];

@@ -12,7 +12,7 @@
       title: 'درس ساختمان داده‌ها و الگوریتم‌ها', icon: '📚', open: true,
       items: [
         { id: 'stack-queue', title: 'شبیه‌ساز صف و پشته', file: 'sims/stack-queue.js' },
-        { id: 'graph-traversal', title: 'شبیه‌ساز پیمایش عمقی و سطحی گراف (DFS / BFS)', file: 'sims/graph-traversal.js', soon: true }
+        { id: 'graph-traversal', title: 'شبیه‌ساز پیمایش عمقی و سطحی گراف (DFS / BFS)', file: 'sims/graph-traversal.js', deps: ['lib/stepper.js'] }
       ]
     }
   ];
@@ -102,10 +102,12 @@
   /* ---------- بارگذاری شبیه‌ساز ---------- */
   const find = (id) => { for (const c of MENU) for (const it of c.items) if (it.id === id) return it; return null; };
 
+  const loaded = {};
   function loadScript(src) {
-    return new Promise((resolve, reject) => {
+    if (loaded[src]) return loaded[src];
+    return loaded[src] = new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('load failed: ' + src));
+      s.src = src; s.onload = resolve; s.onerror = () => { delete loaded[src]; reject(new Error('load failed: ' + src)); };
       document.head.appendChild(s);
     });
   }
@@ -126,7 +128,7 @@
     teardown();
     view.innerHTML = '<div class="loading">در حال بارگذاری…</div>';
     try {
-      if (!sims[id]) await loadScript(item.file);
+      if (!sims[id]) { for (const d of (item.deps || [])) await loadScript(d); await loadScript(item.file); }
       if (!sims[id]) throw new Error('not registered');
     } catch (e) {
       if (my === seq) view.innerHTML = '<div class="loading err">بارگذاری این شبیه‌ساز ممکن نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.</div>';

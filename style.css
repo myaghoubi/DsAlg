@@ -164,7 +164,8 @@ details pre.code{margin-bottom:6px}
 /* ---- پوسته: عنوان، منوی اصلی، ناحیه‌ی شبیه‌ساز ---- */
 .brand{display:flex;align-items:center;gap:8px;min-width:0}
 .brand h1{min-width:0}
-.btn.icon{padding:0 9px;font-size:18px;line-height:1.6;min-width:36px}
+.btn.icon{padding:0 9px;font-size:20px;line-height:1.6;min-width:36px;border:0;background:transparent;box-shadow:none}
+.btn.icon:hover,.btn.icon:focus-visible{background:rgba(37,99,235,.12)}
 #view{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 .loading{padding:40px 16px;text-align:center;color:var(--mut)}
 .loading.err{color:var(--err)}
