@@ -398,8 +398,8 @@ const HTML = `
       <pre class="code" id="code"></pre>
       <div class="legend">متغیرهای سراسری برای سادگی بدون <code>global</code> نوشته شده‌اند. خط هایلایت‌شده «همین الان اجرا شد» و تصویر، نتیجه‌ی آن است.</div>
     </section>
-    <section class="card tracebox">
-      <div class="trhead" id="trHead" role="button" tabindex="0" title="باز و بسته کردن"><b><span id="trTog">▾</span> Trace و Watch</b><span class="legend">هر خط: دستور اجراشده + مقدار متغیرها بعد از آن · متغیر تغییرکرده زرد است</span></div>
+    <section class="card tracebox collapsed">
+      <div class="trhead" id="trHead" role="button" tabindex="0" title="باز و بسته کردن"><b><span id="trTog">▸</span> Trace و Watch</b><span class="legend">هر خط: دستور اجراشده + مقدار متغیرها بعد از آن · متغیر تغییرکرده زرد است</span></div>
       <div class="trlist" id="trace"></div>
     </section>
     </div>

@@ -473,6 +473,7 @@ function mount(view) {
     },
     render: (step) => { drawTree(step.snap); drawState(step.snap); },
     onTab: (id) => { S.op = id; syncOp(); },
+    traceOpen: false,
     hint: 'عملیات و کلید را انتخاب و «اجرای عملیات» را بزنید؛ سپس با «بعدی» یا «پخش» مراحل را دنبال کنید.'
   });
 
