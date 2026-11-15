@@ -704,6 +704,7 @@ function mount(view) {
     }
     $('#code').innerHTML = op.lines.map((l, i) => '<span class="ln' + (i === active ? ' cur' : '') + '"><i>' + (i + 1) + '</i>' + hl(l) + (i === active ? iv : '') + '</span>').join('');
     $('#decl').innerHTML = E.decl(key(), S.N).split('\n').map(hl).join('\n');
+    if (active >= 0) window.Follow.revealLine($('#code').querySelector('.ln.cur'));
   }
 
   /* مقدار متغیرها (Watch) به‌صورت فشرده؛ متغیر تغییرکرده نسبت به گام قبل زرد می‌شود */
@@ -734,18 +735,7 @@ function mount(view) {
   }
 
   /* اسکرول نرم: فقط وقتی سطر جاری از ناحیه‌ی قابل‌مشاهده خارج شده باشد */
-  function revealRow(box, c) {
-    const th = box.querySelector('.tr.th'), head = th ? th.offsetHeight : 0;
-    const top = c.offsetTop, bot = top + c.offsetHeight;
-    let t = null;
-    if (top < box.scrollTop + head) t = top - head - 6;
-    else if (bot > box.scrollTop + box.clientHeight) t = bot - box.clientHeight + 6;
-    if (t === null) return;
-    t = Math.max(0, t);
-    if (box.scrollTo) box.scrollTo({ top: t, behavior: 'smooth' }); else box.scrollTop = t;
-    /* پس از پایان انیمیشن یک‌بار دیگر بررسی می‌کنیم (تغییر ارتفاع سطرها در حین اسکرول) */
-    if (!box._rv) box._rv = setTimeout(() => { box._rv = null; const cc = box.querySelector('.tr.cur'); if (cc && !box._rvd) { box._rvd = 1; revealRow(box, cc); box._rvd = 0; } }, 450);
-  }
+  function revealRow(box, c) { window.Follow.revealRow(box, c); }
 
   function renderCtrl() {
     const n = S.steps.length, has = n > 0;

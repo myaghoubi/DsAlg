@@ -8,11 +8,11 @@ const esc = Stepper.esc;
 
 /* ===================== شبه‌کد پایتون (هر خط یک برچسب برای ارجاع از موتور دارد) ===================== */
 const COMMON = [
-  [0, 'class Node:'], [0, '    def __init__(self, key):'], [0, '        self.key = key'], [0, '        self.left = None'],
-  [0, '        self.right = None'], [0, '        self.height = 1'], [0, ''],
-  [0, 'def height(n):'], [0, '    return n.height if n else 0'], [0, ''],
-  [0, 'def update(n):'], [0, '    n.height = 1 + max(height(n.left), height(n.right))'], [0, ''],
-  [0, 'def balance(n):'], [0, '    return height(n.left) - height(n.right)'], [0, ''],
+  ['in_cls', 'class Node:'], ['in_def', '    def __init__(self, key):'], ['in_key', '        self.key = key'], ['in_l', '        self.left = None'],
+  ['in_r', '        self.right = None'], ['in_h', '        self.height = 1'], [0, ''],
+  ['h_def', 'def height(n):'], ['h_ret', '    return n.height if n else 0'], [0, ''],
+  ['u_def', 'def update(n):'], ['u_set', '    n.height = 1 + max(height(n.left), height(n.right))'], [0, ''],
+  ['b_def', 'def balance(n):'], ['b_ret', '    return height(n.left) - height(n.right)'], [0, ''],
   ['rr_def', 'def rotate_right(y):'], ['rr_x', '    x = y.left'], ['rr_yl', '    y.left = x.right'], ['rr_xr', '    x.right = y'],
   ['rr_uy', '    update(y)'], ['rr_ux', '    update(x)'], ['rr_ret', '    return x'], [0, ''],
   ['rl_def', 'def rotate_left(x):'], ['rl_y', '    y = x.right'], ['rl_xr', '    x.right = y.left'], ['rl_yl', '    y.left = x'],
@@ -29,7 +29,7 @@ const INSERT = [
   ['i_eq', '    else:'], ['i_dup', '        return n          # کلید تکراری'], ['i_rb', '    return rebalance(n)']
 ];
 const DELETE = [
-  [0, 'def min_node(n):'], [0, '    while n.left:'], [0, '        n = n.left'], [0, '    return n'], [0, ''],
+  ['mn_def', 'def min_node(n):'], ['mn_w', '    while n.left:'], ['mn_n', '        n = n.left'], ['mn_ret', '    return n'], [0, ''],
   ['d_def', 'def delete(n, key):'], ['d_c0', '    if n is None:'], ['d_none', '        return None'],
   ['d_lt', '    if key < n.key:'], ['d_l', '        n.left = delete(n.left, key)'],
   ['d_gt', '    elif key > n.key:'], ['d_r', '        n.right = delete(n.right, key)'],
@@ -55,19 +55,21 @@ const hgt = (s) => (s ? s.h : 0);
 const inorder = (s, a = []) => { if (s) { inorder(s.l, a); a.push(s.key); inorder(s.r, a); } return a; };
 const preorder = (s, a = []) => { if (s) { a.push(s.key); preorder(s.l, a); preorder(s.r, a); } return a; };
 
-/* اجرای یک عملیات روی درخت (ساختار ساده‌شده‌ی serialize شده) ← { steps, tree, nextId, changed } */
-function run(op, tree, key, nextId, silent) {
+/* اجرای یک عملیات روی درخت (ساختار serialize شده) ← { steps, tree, nextId, changed }
+   deep=true: اجرای گام‌به‌گام داخل همه‌ی توابع (height، update، balance، سازنده‌ی Node، min_node) با توقف روی عنوان هر تابع */
+function run(op, tree, key, nextId, silent, deep) {
   const T = { root: deser(tree) };
   let nid = nextId, changed = false;
   const KEY = key;
+  const L = CODE[op].L;
   const steps = [], frames = [];
   const top = () => frames[frames.length - 1];
   const push = (fn, n, withKey, pname, kk) => {
     const vars = {};
-    const key = kk === undefined ? KEY : kk;
-    if (withKey) vars.key = key;
+    const k = kk === undefined ? KEY : kk;
+    if (withKey) vars.key = k;
     vars[pname || 'n'] = n;
-    frames.push({ fn, label: fn + '(' + nm(n) + (withKey ? ', ' + key : '') + ')', vars });
+    frames.push({ fn, label: fn + '(' + nm(n) + (withKey ? ', ' + k : '') + ')', vars });
   };
   const sv = (v) => (v === null ? { k: 'none' } : (typeof v === 'number' ? { k: 'num', v } : { k: 'node', id: v.id, key: v.key }));
   function rec(line, note, ex) {
@@ -78,19 +80,51 @@ function run(op, tree, key, nextId, silent) {
     Object.keys(src).forEach((k) => { if (src[k] !== undefined) vars[k] = sv(src[k]); });
     steps.push({ line, note, snap: { tree: ser(T.root), vars, calls: frames.map((f) => f.label), bf: ex.bf || null, newId: ex.newId || null, mark: ex.mark || [], fin: !!ex.fin } });
   }
-  const upd = (n) => { n.h = 1 + Math.max(H(n.l), H(n.r)); };
+
+  /* ----- توابع کمکی ----- */
+  function heightFn(n) {
+    if (!deep) return H(n);
+    push('height', n);
+    rec(L.h_def, 'فراخوانی height(' + nm(n) + ').');
+    rec(L.h_ret, 'return n.height if n else 0 ← ' + (n ? 'n هست، پس ارتفاع ذخیره‌شده‌ی آن = ' + n.h : 'n برابر None است، پس 0') + '.');
+    frames.pop();
+    return H(n);
+  }
+  function updateFn(n, callLine) {
+    if (!deep) { n.h = 1 + Math.max(H(n.l), H(n.r)); rec(callLine, 'update(' + nm(n) + '): ارتفاع = 1 + max(' + H(n.l) + ', ' + H(n.r) + ') = ' + n.h); return; }
+    rec(callLine, 'فراخوانی update(' + nm(n) + ').');
+    push('update', n);
+    rec(L.u_def, 'ورود به تابع update با n = ' + nm(n) + '.');
+    rec(L.u_set, 'محاسبه‌ی n.height = 1 + max(height(n.left), height(n.right)) — ابتدا دو فراخوانی height.');
+    const hl = heightFn(n.l), hr = heightFn(n.r);
+    n.h = 1 + Math.max(hl, hr);
+    rec(L.u_set, 'n.height = 1 + max(' + hl + ', ' + hr + ') = ' + n.h + ' — ارتفاع ' + nm(n) + ' بروز شد.');
+    frames.pop();
+  }
+  function balanceFn(n, callLine, why) {
+    if (!deep) return H(n.l) - H(n.r);
+    rec(callLine, 'فراخوانی balance(' + nm(n) + ')' + (why ? ' ' + why : '') + '.');
+    push('balance', n);
+    rec(L.b_def, 'ورود به تابع balance با n = ' + nm(n) + '.');
+    rec(L.b_ret, 'محاسبه‌ی height(n.left) - height(n.right) — دو فراخوانی height.');
+    const hl = heightFn(n.l), hr = heightFn(n.r), b = hl - hr;
+    rec(L.b_ret, 'return ' + hl + ' − ' + hr + ' = ' + b + '.');
+    frames.pop();
+    return b;
+  }
 
   function rotateRight(y, ctx) {
     push('rotate_right', y, false, 'y');
     const fr = top();
+    rec(L.rr_def, 'ورود به rotate_right با y = ' + nm(y) + ' (چرخش به راست).');
     const x = y.l; fr.vars.x = x;
     rec(L.rr_x, 'x = y.left = ' + nm(x) + ' — x فرزند چپ y است و قرار است جای y را بگیرد.');
     const B = x.r;
     rec(L.rr_yl, 'y.left = x.right: زیردرخت راست x (' + (B ? nm(B) : 'تهی') + ') به‌عنوان فرزند چپ y وصل می‌شود. (تصویر در خط بعد کامل می‌شود.)', { mark: B ? [B.id] : [] });
     y.l = B; x.r = y; ctx.set(x); changed = true;
     rec(L.rr_xr, 'x.right = y: y فرزند راست x شد؛ اکنون x ریشه‌ی این زیردرخت است. (اتصال x به والد پس از بازگشت از تابع ثبت می‌شود.)', { mark: [x.id, y.id] });
-    upd(y); rec(L.rr_uy, 'update(y): ارتفاع ' + nm(y) + ' = ' + y.h);
-    upd(x); rec(L.rr_ux, 'update(x): ارتفاع ' + nm(x) + ' = ' + x.h);
+    updateFn(y, L.rr_uy);
+    updateFn(x, L.rr_ux);
     rec(L.rr_ret, 'return x: ریشه‌ی جدید زیردرخت ' + nm(x) + ' است.');
     frames.pop();
     return x;
@@ -98,14 +132,15 @@ function run(op, tree, key, nextId, silent) {
   function rotateLeft(x, ctx) {
     push('rotate_left', x, false, 'x');
     const fr = top();
+    rec(L.rl_def, 'ورود به rotate_left با x = ' + nm(x) + ' (چرخش به چپ).');
     const y = x.r; fr.vars.y = y;
     rec(L.rl_y, 'y = x.right = ' + nm(y) + ' — y فرزند راست x است و قرار است جای x را بگیرد.');
     const B = y.l;
     rec(L.rl_xr, 'x.right = y.left: زیردرخت چپ y (' + (B ? nm(B) : 'تهی') + ') به‌عنوان فرزند راست x وصل می‌شود. (تصویر در خط بعد کامل می‌شود.)', { mark: B ? [B.id] : [] });
     x.r = B; y.l = x; ctx.set(y); changed = true;
     rec(L.rl_yl, 'y.left = x: x فرزند چپ y شد؛ اکنون y ریشه‌ی این زیردرخت است. (اتصال y به والد پس از بازگشت از تابع ثبت می‌شود.)', { mark: [x.id, y.id] });
-    upd(x); rec(L.rl_ux, 'update(x): ارتفاع ' + nm(x) + ' = ' + x.h);
-    upd(y); rec(L.rl_uy, 'update(y): ارتفاع ' + nm(y) + ' = ' + y.h);
+    updateFn(x, L.rl_ux);
+    updateFn(y, L.rl_uy);
     rec(L.rl_ret, 'return y: ریشه‌ی جدید زیردرخت ' + nm(y) + ' است.');
     frames.pop();
     return y;
@@ -113,14 +148,22 @@ function run(op, tree, key, nextId, silent) {
   function rebalance(n, ctx) {
     push('rebalance', n);
     const fr = top();
-    upd(n);
-    rec(L.rb_upd, 'update(n): ارتفاع ' + nm(n) + ' = 1 + max(' + H(n.l) + ', ' + H(n.r) + ') = ' + n.h);
-    const b = H(n.l) - H(n.r); fr.vars.b = b;
-    rec(L.rb_bal, 'b = balance(n) = ارتفاع چپ − ارتفاع راست = ' + H(n.l) + ' − ' + H(n.r) + ' = ' + b + (Math.abs(b) > 1 ? '  ← نامتوازن!' : '  ← متوازن'), { bf: { id: n.id, v: b } });
-    rec(L.rb_c1, 'b > 1 ؟ ' + (b > 1 ? 'درست — درخت چپ‌سنگین است.' : 'نادرست.'), { bf: { id: n.id, v: b } });
+    rec(L.rb_def, 'ورود به تابع rebalance با n = ' + nm(n) + '.');
+    updateFn(n, L.rb_upd);
+    let b;
+    if (deep) {
+      b = balanceFn(n, L.rb_bal);
+      fr.vars.b = b;
+      rec(L.rb_bal, 'b = ' + b + (Math.abs(b) > 1 ? '  ← نامتوازن!' : '  ← متوازن'), { bf: { id: n.id, v: b } });
+    } else {
+      b = H(n.l) - H(n.r); fr.vars.b = b;
+      rec(L.rb_bal, 'b = balance(n) = ارتفاع چپ − ارتفاع راست = ' + H(n.l) + ' − ' + H(n.r) + ' = ' + b + (Math.abs(b) > 1 ? '  ← نامتوازن!' : '  ← متوازن'), { bf: { id: n.id, v: b } });
+    }
+    const bfx = { bf: { id: n.id, v: b } };
+    rec(L.rb_c1, 'b > 1 ؟ ' + (b > 1 ? 'درست — درخت چپ‌سنگین است.' : 'نادرست.'), bfx);
     if (b > 1) {
-      const lb = H(n.l.l) - H(n.l.r);
-      rec(L.rb_c2, 'balance(n.left) < 0 ؟ balance(' + nm(n.l) + ') = ' + lb + ' → ' + (lb < 0 ? 'درست: حالت LR (دو چرخش).' : 'نادرست: حالت LL (یک چرخش به راست).'), { bf: { id: n.id, v: b } });
+      const lb = balanceFn(n.l, L.rb_c2, '(برای فرزند چپ)');
+      rec(L.rb_c2, 'balance(n.left) < 0 ؟ balance(' + nm(n.l) + ') = ' + lb + ' → ' + (lb < 0 ? 'درست: حالت LR (دو چرخش).' : 'نادرست: حالت LL (یک چرخش به راست).'), bfx);
       if (lb < 0) {
         rec(L.rb_lr, 'n.left = rotate_left(n.left): ابتدا فرزند چپ به چپ چرخانده می‌شود تا حالت LL شود.');
         n.l = rotateLeft(n.l, { set: (s) => { n.l = s; } });
@@ -131,10 +174,10 @@ function run(op, tree, key, nextId, silent) {
       frames.pop();
       return res;
     }
-    rec(L.rb_c3, 'b < -1 ؟ ' + (b < -1 ? 'درست — درخت راست‌سنگین است.' : 'نادرست.'), { bf: { id: n.id, v: b } });
+    rec(L.rb_c3, 'b < -1 ؟ ' + (b < -1 ? 'درست — درخت راست‌سنگین است.' : 'نادرست.'), bfx);
     if (b < -1) {
-      const rb = H(n.r.l) - H(n.r.r);
-      rec(L.rb_c4, 'balance(n.right) > 0 ؟ balance(' + nm(n.r) + ') = ' + rb + ' → ' + (rb > 0 ? 'درست: حالت RL (دو چرخش).' : 'نادرست: حالت RR (یک چرخش به چپ).'), { bf: { id: n.id, v: b } });
+      const rb = balanceFn(n.r, L.rb_c4, '(برای فرزند راست)');
+      rec(L.rb_c4, 'balance(n.right) > 0 ؟ balance(' + nm(n.r) + ') = ' + rb + ' → ' + (rb > 0 ? 'درست: حالت RL (دو چرخش).' : 'نادرست: حالت RR (یک چرخش به چپ).'), bfx);
       if (rb > 0) {
         rec(L.rb_rl, 'n.right = rotate_right(n.right): ابتدا فرزند راست به راست چرخانده می‌شود تا حالت RR شود.');
         n.r = rotateRight(n.r, { set: (s) => { n.r = s; } });
@@ -150,12 +193,28 @@ function run(op, tree, key, nextId, silent) {
     return n;
   }
 
+  /* سازنده‌ی Node(key): در حالت deep داخل __init__ می‌رود */
+  function makeNode(k, callLine) {
+    const nn = { id: nid++, key: k, l: null, r: null, h: 1 };
+    if (deep) {
+      rec(callLine, 'فراخوانی Node(' + k + ') — ساخت گره‌ی جدید.');
+      frames.push({ fn: 'Node.__init__', label: 'Node.__init__(self, ' + k + ')', vars: { key: k } });
+      rec(L.in_def, 'ورود به سازنده‌ی __init__ با key = ' + k + '.');
+      rec(L.in_key, 'self.key = key ← ' + k);
+      rec(L.in_l, 'self.left = None');
+      rec(L.in_r, 'self.right = None');
+      rec(L.in_h, 'self.height = 1 — گره‌ی تازه یک برگ است.');
+      frames.pop();
+    }
+    return nn;
+  }
+
   function insert(n, ctx) {
     push('insert', n, true);
     rec(L.i_def, 'فراخوانی insert با n = ' + nm(n) + ' و key = ' + key + '.');
     rec(L.i_c0, 'n is None ؟ ' + (n === null ? 'درست — جای درج پیدا شد.' : 'نادرست.'));
     if (n === null) {
-      const nn = { id: nid++, key, l: null, r: null, h: 1 };
+      const nn = makeNode(key, L.i_new);
       ctx.set(nn); changed = true;
       rec(L.i_new, 'گره جدید Node(' + key + ') ساخته و برگردانده شد؛ والد آن را به فرزند خود وصل می‌کند.', { newId: nn.id });
       frames.pop();
@@ -183,6 +242,25 @@ function run(op, tree, key, nextId, silent) {
     const res = rebalance(n, ctx);
     frames.pop();
     return res;
+  }
+
+  /* min_node(n): در حالت deep حلقه‌ی while خط‌به‌خط اجرا می‌شود */
+  function minNode(n0, callLine) {
+    if (!deep) { let s = n0; while (s.l) s = s.l; return s; }
+    rec(callLine, 'فراخوانی min_node(' + nm(n0) + ') برای یافتن جانشین.');
+    push('min_node', n0);
+    const fr = top();
+    rec(L.mn_def, 'ورود به تابع min_node با n = ' + nm(n0) + '.');
+    let s = n0;
+    for (;;) {
+      rec(L.mn_w, 'while n.left ؟ ' + (s.l ? 'n.left = ' + nm(s.l) + ' → ادامه.' : 'n.left برابر None است → حلقه تمام می‌شود.'), { mark: [s.id] });
+      if (!s.l) break;
+      s = s.l; fr.vars.n = s;
+      rec(L.mn_n, 'n = n.left → ' + nm(s) + '.', { mark: [s.id] });
+    }
+    rec(L.mn_ret, 'return n: کوچک‌ترین کلید زیردرخت = ' + s.key + '.', { mark: [s.id] });
+    frames.pop();
+    return s;
   }
 
   function del(n, ctx, key) {
@@ -221,9 +299,9 @@ function run(op, tree, key, nextId, silent) {
           frames.pop();
           return n.l;
         }
-        let s = n.r; while (s.l) s = s.l;
+        const s = minNode(n.r, L.d_s);
         top().vars.s = s;
-        rec(L.d_s, 'گره دو فرزند دارد. s = min_node(n.right) = ' + nm(s) + ' — کوچک‌ترین کلید زیردرخت راست (جانشین میان‌ترتیب).', { mark: [s.id] });
+        rec(L.d_s, 's = min_node(n.right) = ' + nm(s) + ' — کوچک‌ترین کلید زیردرخت راست (جانشین میان‌ترتیب).', { mark: [s.id] });
         n.key = s.key; changed = true;
         rec(L.d_cp, 'n.key = s.key: کلید گره‌ی حذفی با ' + s.key + ' جایگزین شد (فعلاً کلید ' + s.key + ' دوبار در درخت است).');
         rec(L.d_rd, 'حذف جانشین از زیردرخت راست: delete(n.right, ' + s.key + ').');
@@ -237,15 +315,12 @@ function run(op, tree, key, nextId, silent) {
     return res;
   }
 
-  /* رکوردهای «نام ← خط» از جدول CODE همان عملیات؛ برای حالت silent لازم نیست */
-  const L = CODE[op].L;
-  const sub = (s) => ({ vars: s });
   const res = op === 'insert' ? insert(T.root, { set: (s) => { T.root = s; } }) : del(T.root, { set: (s) => { T.root = s; } }, key);
   T.root = res;
   const msg = op === 'insert'
     ? (changed ? 'پایان: کلید ' + key + ' درج شد و درخت AVL متوازن ماند. root = ' + nm(res) : 'پایان: کلید ' + key + ' تکراری بود؛ درخت تغییری نکرد.')
     : (changed ? 'پایان: کلید ' + key + ' حذف شد و درخت AVL متوازن ماند. root = ' + nm(res) : 'پایان: کلید ' + key + ' در درخت نبود؛ درخت تغییری نکرد.');
-  rec(-1, msg, Object.assign(sub({ root: res }), { fin: true }));
+  rec(-1, msg, { vars: { root: res }, fin: true });
   return { steps, tree: ser(T.root), nextId: nid, changed };
 }
 
@@ -304,6 +379,7 @@ const HTML = `
         <button class="btn pri" id="btnRun">▶ اجرای عملیات</button>
         <span class="lbl" id="avInfo"></span>
       </div>
+      <div class="row"><label class="lbl" style="cursor:pointer"><input type="checkbox" id="deepChk" checked> ورود به همه‌ی توابع (height، update، balance، …)</label></div>
     </div>
     <div class="card mini">
       <div class="row"><span class="lbl">نمونه</span>
@@ -422,7 +498,7 @@ function mount(view) {
     if ($('#keyIn').value.trim() === '' || !okKey(k)) { toast('یک عدد صحیح (بین ‎−۹۹۹ تا ۹۹۹) به‌عنوان کلید وارد کنید.'); return; }
     if (S.op === 'insert' && count(S.tree) >= MAX_NODES && !inorder(S.tree).includes(k)) { toast('حداکثر ' + MAX_NODES + ' گره پشتیبانی می‌شود.'); return; }
     const pre = S.tree;
-    const r = run(S.op, S.tree, k, S.nextId, false);
+    const r = run(S.op, S.tree, k, S.nextId, false, $('#deepChk').checked);
     S.tree = r.tree; S.nextId = r.nextId;
     S.pre = pre;
     info();
