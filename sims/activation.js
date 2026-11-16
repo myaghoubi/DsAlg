@@ -49,10 +49,10 @@ function mount(view) {
         '<div class="row"><button class="btn pri ac" data-c="' + c.idx + '">فعال‌سازی</button><span class="msg ' + (msgs[c.idx] ? msgs[c.idx].t : '') + '" id="m' + c.idx + '">' + esc(msgs[c.idx] ? msgs[c.idx].m : (f ? 'برای دسترسی به این درس، کد فعال‌سازی را وارد کنید.' : '')) + '</span></div></section>';
     });
     h += '<section class="card"><h2><span>🕒 کد زمانیِ استاد</span></h2>' +
-      '<p class="nt">اگر استاد در کلاس یک کد زمانی نمایش داد (QR یا متن)، آن را اینجا وارد کنید تا فقط همان مبحث تا پایان مهلت برایتان باز شود. (اسکن QR با دوربین گوشی هم مستقیم همین کار را می‌کند.)</p>' +
+      '<p class="nt">اگر استاد در کلاس یک کد زمانی نمایش داد (QR یا متن)، آن را اینجا وارد کنید (کد فقط چند دقیقه معتبر است) تا فقط همان مبحث، برای مدتی که استاد تعیین کرده، برایتان باز شود. (اسکن QR با دوربین گوشی هم مستقیم همین کار را می‌کند.)</p>' +
       '<textarea id="tcIn" rows="3" placeholder="کد زمانی (DST1-…) یا پیوند">' + esc(vals.tcIn || '') + '</textarea>' +
       '<div class="row"><button class="btn sec" id="tcGo">باز کردن مبحث</button><span class="msg ' + (msgs.tc ? msgs.tc.t : '') + '" id="mtc">' + esc(msgs.tc ? msgs.tc.m : '') + '</span></div>';
-    if (gr.length) h += '<p class="nt">دسترسی‌های موقت فعال:</p>' + gr.map((g) => { const c = C[g.course]; return '<p class="nt">• ' + esc(c ? c.title : '') + ' — «' + esc(c ? c.topics[g.topic] : '') + '» تا ساعت ' + tm(g.endMs) + '</p>'; }).join('');
+    if (gr.length) h += '<p class="nt">دسترسی‌های موقت فعال:</p>' + gr.map((g) => { const c = C[g.course]; return '<p class="nt">• ' + esc(c ? c.title : '') + ' — «' + esc(c ? c.topics[g.topic] : '') + '» تا ' + (g.endMs - L.now() > 20 * 36e5 ? dt(g.endMs) : 'ساعت ' + tm(g.endMs)) + '</p>'; }).join('');
     h += '</section>';
     root.innerHTML = h;
     if (focus) { const el = root.querySelector('#c' + focus.ci); if (el && !root._f) { root._f = 1; el.scrollIntoView({ block: 'center' }); } }
