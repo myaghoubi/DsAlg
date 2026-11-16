@@ -199,10 +199,13 @@
 
   /* کد زمانیِ آمده از پیوند (#tc=...) */
   async function handleTc(h) {
-    const r = await Lic.redeem(h.slice(3));
+    let r;
+    try { r = await Lic.redeem(h.slice(3)); }
+    catch (e) { r = { ok: false, msg: 'این مرورگر از رمزنگاری امن پشتیبانی نمی‌کند (آدرس باید https باشد؛ پیوند را در Chrome یا Safari باز کنید، نه داخل برنامه‌ی پیام‌رسان).' }; }
     if (r.ok && r.topicId) { window.appToast('مبحث برای شما باز شد (تا ' + (r.endMs - Lic.now() > 20 * 36e5 ? new Date(r.endMs).toLocaleDateString('fa-IR') : 'ساعت ' + new Date(r.endMs).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })) + ').'); history.replaceState(null, '', '#' + r.topicId); return open(r.topicId); }
-    window.appToast(r.msg || 'کد زمانی معتبر نیست.');
-    history.replaceState(null, '', '#activation'); open('activation');
+    window.appTcMsg = r.msg || 'کد زمانی معتبر نیست.';          /* در صفحه‌ی فعال‌سازی، ماندگار نمایش داده می‌شود */
+    window.appToast('ورود با پیوند کد زمانی ناموفق بود.');
+    history.replaceState(null, '', '#activation'); current && current.id === 'activation' ? (teardown(), open('activation')) : open('activation');
   }
   function route() {
     const h = location.hash.replace(/^#/, '');
