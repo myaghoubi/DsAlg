@@ -26,6 +26,7 @@ function mount(view) {
   const L = window.License, C = window.COURSES;
   let alive = true; const vals = {}; const msgs = {};
   const focus = window.appFocus || null; window.appFocus = null;
+  if (window.appTcMsg) { msgs.tc = { t: 'err', m: '✗ ' + window.appTcMsg }; window.appTcMsg = null; }
   const root = view.querySelector('.act');
 
   function status(c) {
