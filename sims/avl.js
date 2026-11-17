@@ -45,283 +45,78 @@ function build(parts) {
 }
 const CODE = { insert: build(COMMON.concat(INSERT)), delete: build(COMMON.concat(DELETE)) };
 
-/* ===================== موتور ===================== */
-const H = (n) => (n ? n.h : 0);
-const nm = (n) => (n ? 'Node(' + n.key + ')' : 'None');
-const ser = (n) => (n ? { id: n.id, key: n.key, h: n.h, l: ser(n.l), r: ser(n.r) } : null);
-const deser = (s) => (s ? { id: s.id, key: s.key, h: s.h, l: deser(s.l), r: deser(s.r) } : null);
-const count = (s) => (s ? 1 + count(s.l) + count(s.r) : 0);
-const hgt = (s) => (s ? s.h : 0);
-const inorder = (s, a = []) => { if (s) { inorder(s.l, a); a.push(s.key); inorder(s.r, a); } return a; };
-const preorder = (s, a = []) => { if (s) { a.push(s.key); preorder(s.l, a); preorder(s.r, a); } return a; };
+/* ===================== موتور: اجرای واقعیِ همین کد با مفسر MiniPy ===================== */
+/* حالت پایدار درخت = عکس‌فوری حافظه: { objs:{id:{cls,a:{key,left,right,height}}}, glob:{root}, nextId } */
+const EMPTY = () => ({ objs: {}, glob: { root: { k: 'none' } }, nextId: 1 });
+const ATOMIC = ['height', 'update', 'balance', 'min_node', 'Node'];
+const ptr = (r) => (r && r.k === 'obj' ? r.id : null);
+const numOf = (r) => (r && r.k === 'num' ? r.v : undefined);
+const rootOf = (st) => ptr(st.glob.root);
 
-/* اجرای یک عملیات روی درخت (ساختار serialize شده) ← { steps, tree, nextId, changed }
-   deep=true: اجرای گام‌به‌گام داخل همه‌ی توابع (height، update، balance، سازنده‌ی Node، min_node) با توقف روی عنوان هر تابع */
-function run(op, tree, key, nextId, silent, deep) {
-  const T = { root: deser(tree) };
-  let nid = nextId, changed = false;
-  const KEY = key;
-  const L = CODE[op].L;
-  const steps = [], frames = [];
-  const top = () => frames[frames.length - 1];
-  const push = (fn, n, withKey, pname, kk) => {
-    const vars = {};
-    const k = kk === undefined ? KEY : kk;
-    if (withKey) vars.key = k;
-    vars[pname || 'n'] = n;
-    frames.push({ fn, label: fn + '(' + nm(n) + (withKey ? ', ' + k : '') + ')', vars });
-  };
-  const sv = (v) => (v === null ? { k: 'none' } : (typeof v === 'number' ? { k: 'num', v } : { k: 'node', id: v.id, key: v.key }));
-  function rec(line, note, ex) {
-    if (silent) return;
-    ex = ex || {};
-    const vars = {};
-    const src = ex.vars || (frames.length ? top().vars : {});
-    Object.keys(src).forEach((k) => { if (src[k] !== undefined) vars[k] = sv(src[k]); });
-    steps.push({ line, note, snap: { tree: ser(T.root), vars, calls: frames.map((f) => f.label), bf: ex.bf || null, newId: ex.newId || null, mark: ex.mark || [], fin: !!ex.fin } });
-  }
+function hydrate(st) {
+  const objs = {};
+  Object.keys(st.objs).forEach((id) => { objs[id] = { id: +id, cls: st.objs[id].cls, a: Object.create(null) }; });
+  Object.keys(st.objs).forEach((id) => {
+    const a = st.objs[id].a;
+    Object.keys(a).forEach((k) => { const r = a[k]; objs[id].a[k] = r.k === 'none' ? null : r.k === 'obj' ? objs[r.id] : r.v; });
+  });
+  const rid = rootOf(st);
+  return rid === null ? null : objs[rid];
+}
 
-  /* ----- توابع کمکی ----- */
-  function heightFn(n) {
-    if (!deep) return H(n);
-    push('height', n);
-    rec(L.h_def, 'فراخوانی height(' + nm(n) + ').');
-    rec(L.h_ret, 'return n.height if n else 0 ← ' + (n ? 'n هست، پس ارتفاع ذخیره‌شده‌ی آن = ' + n.h : 'n برابر None است، پس 0') + '.');
-    frames.pop();
-    return H(n);
+/* بررسی اعتبار AVL بودن حالت (برای گزارش پایان اجرا و آزمون‌ها) */
+function analyze(st) {
+  const res = { count: 0, height: 0, inorder: [], problems: [] };
+  const seen = new Set(), path = new Set();
+  const nm = (id) => 'Node(' + (numOf(st.objs[id].a.key) === undefined ? '?' : numOf(st.objs[id].a.key)) + ')';
+  function go(id) {
+    if (id === null || id === undefined || !st.objs[id]) return 0;
+    if (path.has(id)) { res.problems.push('حلقه در پیوندها (' + nm(id) + ')'); return 0; }
+    if (seen.has(id)) { res.problems.push(nm(id) + ' در دو جای درخت آمده'); return 0; }
+    seen.add(id); path.add(id);
+    const a = st.objs[id].a;
+    const hl = go(ptr(a.left));
+    res.count++; res.inorder.push(numOf(a.key));
+    const hr = go(ptr(a.right));
+    path.delete(id);
+    const h = 1 + Math.max(hl, hr);
+    if (numOf(a.height) !== h) res.problems.push('ارتفاع ذخیره‌شده‌ی ' + nm(id) + ' = ' + (numOf(a.height) === undefined ? '?' : numOf(a.height)) + ' ولی ارتفاع واقعی ' + h + ' است');
+    if (Math.abs(hl - hr) > 1) res.problems.push(nm(id) + ' نامتوازن است (bf = ' + (hl - hr) + ')');
+    return h;
   }
-  function updateFn(n, callLine) {
-    if (!deep) { n.h = 1 + Math.max(H(n.l), H(n.r)); rec(callLine, 'update(' + nm(n) + '): ارتفاع = 1 + max(' + H(n.l) + ', ' + H(n.r) + ') = ' + n.h); return; }
-    rec(callLine, 'فراخوانی update(' + nm(n) + ').');
-    push('update', n);
-    rec(L.u_def, 'ورود به تابع update با n = ' + nm(n) + '.');
-    rec(L.u_set, 'محاسبه‌ی n.height = 1 + max(height(n.left), height(n.right)) — ابتدا دو فراخوانی height.');
-    const hl = heightFn(n.l), hr = heightFn(n.r);
-    n.h = 1 + Math.max(hl, hr);
-    rec(L.u_set, 'n.height = 1 + max(' + hl + ', ' + hr + ') = ' + n.h + ' — ارتفاع ' + nm(n) + ' بروز شد.');
-    frames.pop();
-  }
-  function balanceFn(n, callLine, why) {
-    if (!deep) return H(n.l) - H(n.r);
-    rec(callLine, 'فراخوانی balance(' + nm(n) + ')' + (why ? ' ' + why : '') + '.');
-    push('balance', n);
-    rec(L.b_def, 'ورود به تابع balance با n = ' + nm(n) + '.');
-    rec(L.b_ret, 'محاسبه‌ی height(n.left) - height(n.right) — دو فراخوانی height.');
-    const hl = heightFn(n.l), hr = heightFn(n.r), b = hl - hr;
-    rec(L.b_ret, 'return ' + hl + ' − ' + hr + ' = ' + b + '.');
-    frames.pop();
-    return b;
-  }
+  res.height = go(rootOf(st));
+  for (let i = 1; i < res.inorder.length; i++) if (!(res.inorder[i - 1] < res.inorder[i])) { res.problems.push('ترتیب درخت جست‌وجو (BST) رعایت نشده'); break; }
+  res.ok = !res.problems.length;
+  return res;
+}
 
-  function rotateRight(y, ctx) {
-    push('rotate_right', y, false, 'y');
-    const fr = top();
-    rec(L.rr_def, 'ورود به rotate_right با y = ' + nm(y) + ' (چرخش به راست).');
-    const x = y.l; fr.vars.x = x;
-    rec(L.rr_x, 'x = y.left = ' + nm(x) + ' — x فرزند چپ y است و قرار است جای y را بگیرد.');
-    const B = x.r;
-    rec(L.rr_yl, 'y.left = x.right: زیردرخت راست x (' + (B ? nm(B) : 'تهی') + ') به‌عنوان فرزند چپ y وصل می‌شود. (تصویر در خط بعد کامل می‌شود.)', { mark: B ? [B.id] : [] });
-    y.l = B; x.r = y; ctx.set(x); changed = true;
-    rec(L.rr_xr, 'x.right = y: y فرزند راست x شد؛ اکنون x ریشه‌ی این زیردرخت است. (اتصال x به والد پس از بازگشت از تابع ثبت می‌شود.)', { mark: [x.id, y.id] });
-    updateFn(y, L.rr_uy);
-    updateFn(x, L.rr_ux);
-    rec(L.rr_ret, 'return x: ریشه‌ی جدید زیردرخت ' + nm(x) + ' است.');
-    frames.pop();
-    return x;
+/* اجرای یک عملیات: o = { deep, off:(lineIdx)=>bool, silent } ← { steps, state, err } */
+function run(op, state, key, o) {
+  o = o || {};
+  const prog = MiniPy.parse(CODE[op].lines, o.off || (() => false));
+  const steps = [];
+  const vm = MiniPy.createVM(prog, {
+    deep: o.deep !== false, atomic: ATOMIC, nextId: state.nextId, record: !o.silent, maxSteps: o.silent ? Infinity : 5000,
+    onStep: (line, note, ex, snap) => steps.push({ line, note, snap: snap(ex) })
+  });
+  const root0 = hydrate(state);
+  vm.globals.root = root0;
+  let err = null;
+  try {
+    const rv = vm.run(op, [root0, key]);
+    if (rv !== null && typeof rv !== 'object') throw new MiniPy.PyErr('TypeError', 'تابع ' + op + ' باید گره یا None برگرداند، نه ' + vm.repr(rv) + '؛ root را نمی‌توان به آن تغییر داد');
+    vm.globals.root = rv;
+    const tmp = vm.snapshot({ noFrames: true }); tmp.nextId = vm.nextId();
+    const an = analyze(tmp);
+    vm.emitFinal('پایان: root = ' + vm.repr(rv) + '. ' + (an.ok ? 'درخت حاصل یک AVL معتبر است ✓' : '⚠ درخت حاصل AVL معتبر نیست: ' + an.problems.slice(0, 2).join('؛ ') + '.'), { fin: true });
+  } catch (e) {
+    if (e instanceof MiniPy.PyErr) err = e.pyName + ': ' + e.pyMsg;
+    else if (e instanceof MiniPy.Limit) err = 'LimitError: تعداد گام‌های اجرا از حد مجاز گذشت (حلقه یا بازگشت بی‌پایان؟)';
+    else throw e;
+    vm.emitError(vm.errorLine() >= 0 ? vm.errorLine() : CODE[op].L[op === 'insert' ? 'i_def' : 'd_def'], '❌ ' + err + ' — اجرا در همین خط متوقف شد؛ root تغییر نکرد (ولی تغییرهایی که تا اینجا روی گره‌ها داده شده می‌ماند).', { err, fin: true });
   }
-  function rotateLeft(x, ctx) {
-    push('rotate_left', x, false, 'x');
-    const fr = top();
-    rec(L.rl_def, 'ورود به rotate_left با x = ' + nm(x) + ' (چرخش به چپ).');
-    const y = x.r; fr.vars.y = y;
-    rec(L.rl_y, 'y = x.right = ' + nm(y) + ' — y فرزند راست x است و قرار است جای x را بگیرد.');
-    const B = y.l;
-    rec(L.rl_xr, 'x.right = y.left: زیردرخت چپ y (' + (B ? nm(B) : 'تهی') + ') به‌عنوان فرزند راست x وصل می‌شود. (تصویر در خط بعد کامل می‌شود.)', { mark: B ? [B.id] : [] });
-    x.r = B; y.l = x; ctx.set(y); changed = true;
-    rec(L.rl_yl, 'y.left = x: x فرزند چپ y شد؛ اکنون y ریشه‌ی این زیردرخت است. (اتصال y به والد پس از بازگشت از تابع ثبت می‌شود.)', { mark: [x.id, y.id] });
-    updateFn(x, L.rl_ux);
-    updateFn(y, L.rl_uy);
-    rec(L.rl_ret, 'return y: ریشه‌ی جدید زیردرخت ' + nm(y) + ' است.');
-    frames.pop();
-    return y;
-  }
-  function rebalance(n, ctx) {
-    push('rebalance', n);
-    const fr = top();
-    rec(L.rb_def, 'ورود به تابع rebalance با n = ' + nm(n) + '.');
-    updateFn(n, L.rb_upd);
-    let b;
-    if (deep) {
-      b = balanceFn(n, L.rb_bal);
-      fr.vars.b = b;
-      rec(L.rb_bal, 'b = ' + b + (Math.abs(b) > 1 ? '  ← نامتوازن!' : '  ← متوازن'), { bf: { id: n.id, v: b } });
-    } else {
-      b = H(n.l) - H(n.r); fr.vars.b = b;
-      rec(L.rb_bal, 'b = balance(n) = ارتفاع چپ − ارتفاع راست = ' + H(n.l) + ' − ' + H(n.r) + ' = ' + b + (Math.abs(b) > 1 ? '  ← نامتوازن!' : '  ← متوازن'), { bf: { id: n.id, v: b } });
-    }
-    const bfx = { bf: { id: n.id, v: b } };
-    rec(L.rb_c1, 'b > 1 ؟ ' + (b > 1 ? 'درست — درخت چپ‌سنگین است.' : 'نادرست.'), bfx);
-    if (b > 1) {
-      const lb = balanceFn(n.l, L.rb_c2, '(برای فرزند چپ)');
-      rec(L.rb_c2, 'balance(n.left) < 0 ؟ balance(' + nm(n.l) + ') = ' + lb + ' → ' + (lb < 0 ? 'درست: حالت LR (دو چرخش).' : 'نادرست: حالت LL (یک چرخش به راست).'), bfx);
-      if (lb < 0) {
-        rec(L.rb_lr, 'n.left = rotate_left(n.left): ابتدا فرزند چپ به چپ چرخانده می‌شود تا حالت LL شود.');
-        n.l = rotateLeft(n.l, { set: (s) => { n.l = s; } });
-        rec(L.rb_lr, 'بازگشت: n.left = ' + nm(n.l) + ' — اکنون حالت LL است.');
-      }
-      rec(L.rb_r, 'return rotate_right(n): چرخش به راست حول ' + nm(n) + '.');
-      const res = rotateRight(n, ctx);
-      frames.pop();
-      return res;
-    }
-    rec(L.rb_c3, 'b < -1 ؟ ' + (b < -1 ? 'درست — درخت راست‌سنگین است.' : 'نادرست.'), bfx);
-    if (b < -1) {
-      const rb = balanceFn(n.r, L.rb_c4, '(برای فرزند راست)');
-      rec(L.rb_c4, 'balance(n.right) > 0 ؟ balance(' + nm(n.r) + ') = ' + rb + ' → ' + (rb > 0 ? 'درست: حالت RL (دو چرخش).' : 'نادرست: حالت RR (یک چرخش به چپ).'), bfx);
-      if (rb > 0) {
-        rec(L.rb_rl, 'n.right = rotate_right(n.right): ابتدا فرزند راست به راست چرخانده می‌شود تا حالت RR شود.');
-        n.r = rotateRight(n.r, { set: (s) => { n.r = s; } });
-        rec(L.rb_rl, 'بازگشت: n.right = ' + nm(n.r) + ' — اکنون حالت RR است.');
-      }
-      rec(L.rb_l, 'return rotate_left(n): چرخش به چپ حول ' + nm(n) + '.');
-      const res = rotateLeft(n, ctx);
-      frames.pop();
-      return res;
-    }
-    rec(L.rb_ret, 'return n: نیازی به چرخش نیست.');
-    frames.pop();
-    return n;
-  }
-
-  /* سازنده‌ی Node(key): در حالت deep داخل __init__ می‌رود */
-  function makeNode(k, callLine) {
-    const nn = { id: nid++, key: k, l: null, r: null, h: 1 };
-    if (deep) {
-      rec(callLine, 'فراخوانی Node(' + k + ') — ساخت گره‌ی جدید.');
-      frames.push({ fn: 'Node.__init__', label: 'Node.__init__(self, ' + k + ')', vars: { key: k } });
-      rec(L.in_def, 'ورود به سازنده‌ی __init__ با key = ' + k + '.');
-      rec(L.in_key, 'self.key = key ← ' + k);
-      rec(L.in_l, 'self.left = None');
-      rec(L.in_r, 'self.right = None');
-      rec(L.in_h, 'self.height = 1 — گره‌ی تازه یک برگ است.');
-      frames.pop();
-    }
-    return nn;
-  }
-
-  function insert(n, ctx) {
-    push('insert', n, true);
-    rec(L.i_def, 'فراخوانی insert با n = ' + nm(n) + ' و key = ' + key + '.');
-    rec(L.i_c0, 'n is None ؟ ' + (n === null ? 'درست — جای درج پیدا شد.' : 'نادرست.'));
-    if (n === null) {
-      const nn = makeNode(key, L.i_new);
-      ctx.set(nn); changed = true;
-      rec(L.i_new, 'گره جدید Node(' + key + ') ساخته و برگردانده شد؛ والد آن را به فرزند خود وصل می‌کند.', { newId: nn.id });
-      frames.pop();
-      return nn;
-    }
-    rec(L.i_lt, 'key < n.key ؟ ' + key + ' < ' + n.key + ' → ' + (key < n.key ? 'درست، به چپ می‌رویم.' : 'نادرست.'));
-    if (key < n.key) {
-      rec(L.i_l, 'فراخوانی بازگشتی روی فرزند چپ ' + nm(n) + ' (' + nm(n.l) + ').');
-      n.l = insert(n.l, { set: (s) => { n.l = s; } });
-      rec(L.i_l, 'بازگشت: n.left = ' + nm(n.l) + ' ثبت شد.');
-    } else {
-      rec(L.i_gt, 'key > n.key ؟ ' + key + ' > ' + n.key + ' → ' + (key > n.key ? 'درست، به راست می‌رویم.' : 'نادرست.'));
-      if (key > n.key) {
-        rec(L.i_r, 'فراخوانی بازگشتی روی فرزند راست ' + nm(n) + ' (' + nm(n.r) + ').');
-        n.r = insert(n.r, { set: (s) => { n.r = s; } });
-        rec(L.i_r, 'بازگشت: n.right = ' + nm(n.r) + ' ثبت شد.');
-      } else {
-        rec(L.i_eq, 'else: کلید ' + key + ' از قبل در درخت هست.');
-        rec(L.i_dup, 'return n: کلید تکراری درج نمی‌شود و درخت تغییری نمی‌کند.');
-        frames.pop();
-        return n;
-      }
-    }
-    rec(L.i_rb, 'return rebalance(n): در مسیر بازگشت، ارتفاع و توازن ' + nm(n) + ' بررسی می‌شود.');
-    const res = rebalance(n, ctx);
-    frames.pop();
-    return res;
-  }
-
-  /* min_node(n): در حالت deep حلقه‌ی while خط‌به‌خط اجرا می‌شود */
-  function minNode(n0, callLine) {
-    if (!deep) { let s = n0; while (s.l) s = s.l; return s; }
-    rec(callLine, 'فراخوانی min_node(' + nm(n0) + ') برای یافتن جانشین.');
-    push('min_node', n0);
-    const fr = top();
-    rec(L.mn_def, 'ورود به تابع min_node با n = ' + nm(n0) + '.');
-    let s = n0;
-    for (;;) {
-      rec(L.mn_w, 'while n.left ؟ ' + (s.l ? 'n.left = ' + nm(s.l) + ' → ادامه.' : 'n.left برابر None است → حلقه تمام می‌شود.'), { mark: [s.id] });
-      if (!s.l) break;
-      s = s.l; fr.vars.n = s;
-      rec(L.mn_n, 'n = n.left → ' + nm(s) + '.', { mark: [s.id] });
-    }
-    rec(L.mn_ret, 'return n: کوچک‌ترین کلید زیردرخت = ' + s.key + '.', { mark: [s.id] });
-    frames.pop();
-    return s;
-  }
-
-  function del(n, ctx, key) {
-    push('delete', n, true, undefined, key);
-    rec(L.d_def, 'فراخوانی delete با n = ' + nm(n) + ' و key = ' + key + '.');
-    rec(L.d_c0, 'n is None ؟ ' + (n === null ? 'درست — کلید در درخت نیست.' : 'نادرست.'));
-    if (n === null) {
-      rec(L.d_none, 'return None: کلید ' + key + ' پیدا نشد و درخت تغییری نمی‌کند.');
-      frames.pop();
-      return null;
-    }
-    rec(L.d_lt, 'key < n.key ؟ ' + key + ' < ' + n.key + ' → ' + (key < n.key ? 'درست، به چپ می‌رویم.' : 'نادرست.'));
-    if (key < n.key) {
-      rec(L.d_l, 'فراخوانی بازگشتی روی فرزند چپ ' + nm(n) + ' (' + nm(n.l) + ').');
-      n.l = del(n.l, { set: (s) => { n.l = s; } }, key);
-      rec(L.d_l, 'بازگشت: n.left = ' + nm(n.l) + ' ثبت شد.');
-    } else {
-      rec(L.d_gt, 'key > n.key ؟ ' + key + ' > ' + n.key + ' → ' + (key > n.key ? 'درست، به راست می‌رویم.' : 'نادرست.'));
-      if (key > n.key) {
-        rec(L.d_r, 'فراخوانی بازگشتی روی فرزند راست ' + nm(n) + ' (' + nm(n.r) + ').');
-        n.r = del(n.r, { set: (s) => { n.r = s; } }, key);
-        rec(L.d_r, 'بازگشت: n.right = ' + nm(n.r) + ' ثبت شد.');
-      } else {
-        rec(L.d_eq, 'else: key == n.key — گره‌ی حذفی (' + nm(n) + ') پیدا شد.');
-        rec(L.d_ln, 'n.left is None ؟ ' + (n.l === null ? 'درست.' : 'نادرست.'));
-        if (n.l === null) {
-          ctx.set(n.r); changed = true;
-          rec(L.d_rr, 'return n.right: گره حذف شد و فرزند راست (' + nm(n.r) + ') جای آن را می‌گیرد.');
-          frames.pop();
-          return n.r;
-        }
-        rec(L.d_rn, 'n.right is None ؟ ' + (n.r === null ? 'درست.' : 'نادرست.'));
-        if (n.r === null) {
-          ctx.set(n.l); changed = true;
-          rec(L.d_rl, 'return n.left: گره حذف شد و فرزند چپ (' + nm(n.l) + ') جای آن را می‌گیرد.');
-          frames.pop();
-          return n.l;
-        }
-        const s = minNode(n.r, L.d_s);
-        top().vars.s = s;
-        rec(L.d_s, 's = min_node(n.right) = ' + nm(s) + ' — کوچک‌ترین کلید زیردرخت راست (جانشین میان‌ترتیب).', { mark: [s.id] });
-        n.key = s.key; changed = true;
-        rec(L.d_cp, 'n.key = s.key: کلید گره‌ی حذفی با ' + s.key + ' جایگزین شد (فعلاً کلید ' + s.key + ' دوبار در درخت است).');
-        rec(L.d_rd, 'حذف جانشین از زیردرخت راست: delete(n.right, ' + s.key + ').');
-        n.r = del(n.r, { set: (t) => { n.r = t; } }, s.key);
-        rec(L.d_rd, 'بازگشت: n.right = ' + nm(n.r) + ' ثبت شد.');
-      }
-    }
-    rec(L.d_rb, 'return rebalance(n): در مسیر بازگشت، ارتفاع و توازن ' + nm(n) + ' بررسی می‌شود.');
-    const res = rebalance(n, ctx);
-    frames.pop();
-    return res;
-  }
-
-  const res = op === 'insert' ? insert(T.root, { set: (s) => { T.root = s; } }) : del(T.root, { set: (s) => { T.root = s; } }, key);
-  T.root = res;
-  const msg = op === 'insert'
-    ? (changed ? 'پایان: کلید ' + key + ' درج شد و درخت AVL متوازن ماند. root = ' + nm(res) : 'پایان: کلید ' + key + ' تکراری بود؛ درخت تغییری نکرد.')
-    : (changed ? 'پایان: کلید ' + key + ' حذف شد و درخت AVL متوازن ماند. root = ' + nm(res) : 'پایان: کلید ' + key + ' در درخت نبود؛ درخت تغییری نکرد.');
-  rec(-1, msg, { vars: { root: res }, fin: true });
-  return { steps, tree: ser(T.root), nextId: nid, changed };
+  const ns = vm.snapshot({ noFrames: true }); ns.nextId = vm.nextId();
+  return { steps, state: ns, err };
 }
 
 /* ===================== استایل ===================== */
@@ -331,6 +126,11 @@ const CSS = `
 .avsvg svg{width:100%;height:100%;display:block}
 @media (orientation:landscape) and (min-width:640px){.avsvg{flex:1 1 0;min-height:150px}}
 .avl-edge{stroke:var(--edge);stroke-width:2.2}
+.avl-edge.new{stroke:var(--acc);stroke-width:4}
+.avl-edge.ghost{stroke:var(--err);stroke-width:2.4;stroke-dasharray:5 4;opacity:.75}
+.avl-edge.cross{stroke-dasharray:7 4;opacity:.8}
+.avdet{fill:none;stroke:var(--mut);stroke-dasharray:6 4;opacity:.55;stroke-width:1.5}
+.avcap{font-size:11px;fill:var(--mut);text-anchor:middle}
 .avn circle.c{fill:var(--node);stroke:var(--edge);stroke-width:2.4}
 .avn text.k{font-family:var(--mono);font-size:15px;font-weight:700;fill:var(--tx);text-anchor:middle;pointer-events:none}
 .avn text.h{font-family:var(--mono);font-size:10.5px;fill:var(--mut);text-anchor:middle}
@@ -338,7 +138,6 @@ const CSS = `
 .avn.ref circle.c{stroke:var(--acc2);stroke-width:3.5}
 .avn.cur circle.c{fill:var(--acc);stroke:var(--acc)}
 .avn.cur text.k{fill:#fff}
-.avn.mk circle.c{stroke:var(--warn);stroke-width:5;stroke-dasharray:5 3}
 .avn.nw circle.c{fill:#bbf7d0;stroke:var(--ok);stroke-width:3.5}
 .avn text.bf{font-family:var(--mono);font-size:12px;font-weight:700;text-anchor:start}
 .avn text.bf.ok{fill:var(--ok)}.avn text.bf.bad{fill:var(--err)}
@@ -353,8 +152,11 @@ const CSS = `
 .avlegend i.c{background:var(--acc);border-color:var(--acc)}
 .avlegend i.r{border-color:var(--acc2)}
 .avlegend i.n{background:#bbf7d0;border-color:var(--ok)}
-.avlegend i.m{border:2px dashed var(--warn)}
+.avlegend u{display:inline-block;width:22px;height:0;border-top:3px solid var(--acc);vertical-align:3px;margin-left:4px;text-decoration:none}
+.avlegend u.g{border-top:3px dashed var(--err)}
+.avlegend u.d{border-top:2px dashed var(--mut)}
 .avend{font-weight:700;color:var(--ok);font-size:13px}
+.avoff{font-size:12px;color:var(--warn);font-weight:700}
 `;
 
 const STAGE = `
@@ -362,9 +164,10 @@ const STAGE = `
   <div class="avsvg"><svg id="avsvg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="درخت AVL"></svg></div>
   <div class="avstate" id="avstate"></div>
   <div class="legend avlegend">
-    <span><i class="c"></i>n — گره‌ی جاری تابع</span><span><i class="r"></i>x / y / s — متغیرهای دیگر</span>
-    <span><i class="m"></i>زیردرخت جابه‌جاشونده</span><span><i class="n"></i>گره‌ی جدید</span>
-    <span>عدد زیر هر گره = ارتفاع ذخیره‌شده (height)؛ bf = توازن (چپ − راست)</span>
+    <span><i class="c"></i>n / self — گره‌ی جاری</span><span><i class="r"></i>سایر متغیرها (x، y، s، …)</span>
+    <span><i class="n"></i>گره‌ی تازه‌ساخته</span>
+    <span><u></u>یال تازه (همین گام)</span><span><u class="g"></u>یالی که همین گام برداشته شد</span><span><u class="d"></u>یا کادر خط‌چین: جدا از root</span>
+    <span>عدد زیر هر گره = n.height ذخیره‌شده؛ bf = توازن</span>
   </div>
 </div>`;
 
@@ -391,9 +194,14 @@ const HTML = `
         <button class="btn" id="btnRand">تصادفی</button>
         <button class="btn" id="btnEmpty">خالی</button>
       </div>
+      <div class="row"><span class="lbl">آزمایش با کد</span>
+        <select id="exper" aria-label="آزمایش غیرفعال‌کردن خط‌های کد"></select>
+        <button class="btn" id="btnAllOn">فعال‌سازی همه‌ی خط‌ها</button>
+        <span class="avoff" id="offInfo"></span>
+      </div>
     </div>
   </section>
-` + Stepper.layout(STAGE, { codeNote: 'توابع height / update / balance ساده‌اند و در همان خطِ فراخوانی اجرا می‌شوند. هر گام، نتیجه‌ی خط هایلایت‌شده را نشان می‌دهد.' });
+` + Stepper.layout(STAGE, { codeNote: 'درخت دقیقاً نتیجه‌ی اجرای همین کد است. برای غیرفعال‌کردن (کامنت‌کردن) یک خط یا یک بلوک، روی ☑ کنار شماره‌ی خط بزنید؛ اجرا از نو با کد تازه انجام می‌شود و اثرش (یا خطای پایتون) در درخت دیده می‌شود.' });
 
 /* ===================== رابط کاربری ===================== */
 const PRESETS = [
@@ -406,104 +214,264 @@ const PRESETS = [
   { name: 'حذف گره دوفرزندی: حذف ۵۰', keys: [50, 30, 70, 20, 40, 60, 80], op: 'delete', key: 50 },
   { name: 'درخت ۱۰ کلیدی', keys: [50, 25, 75, 12, 37, 62, 87, 6, 18, 31], op: 'insert', key: 22 }
 ];
+/* آزمایش‌ها: چند خط از کد غیرفعال می‌شود تا اثر آن در درخت دیده شود */
+const EXPERS = [
+  { name: '— کد کامل (بدون آزمایش) —', tags: [] },
+  { name: 'بدون update پس از چرخش (ارتفاع‌ها کهنه می‌مانند)', tags: ['rr_uy', 'rr_ux', 'rl_ux', 'rl_uy'], keys: [30, 20, 40, 10], op: 'insert', key: 5 },
+  { name: 'بدون «x.right = y» در rotate_right (y از درخت جدا می‌شود)', tags: ['rr_xr'], keys: [30, 20, 40, 10], op: 'insert', key: 5 },
+  { name: 'بدون «y.left = x.right» (یک زیردرخت گم می‌شود)', tags: ['rr_yl'], keys: [40, 20, 50, 10, 30], op: 'insert', key: 5 },
+  { name: 'بدون چرخش نهایی (return rotate_right / rotate_left)', tags: ['rb_r', 'rb_l'], keys: [30, 20, 40, 10], op: 'insert', key: 5 },
+  { name: 'بدون «n.left = insert(...)» (کلید جدید وصل نمی‌شود)', tags: ['i_l'], keys: [30, 20, 40], op: 'insert', key: 10 },
+  { name: 'بدون «return rebalance(n)» در insert (تابع None برمی‌گرداند)', tags: ['i_rb'], keys: [30, 20, 40], op: 'insert', key: 10 },
+  { name: 'بدون «self.height = 1» در سازنده (خطای AttributeError)', tags: ['in_h'], keys: [30, 20], op: 'insert', key: 10 },
+  { name: 'حذف: بدون «n.key = s.key» (کلید جانشین کپی نمی‌شود)', tags: ['d_cp'], keys: [50, 30, 70, 20, 40, 60, 80], op: 'delete', key: 50 },
+  { name: 'حذف: بدون «n.right = delete(n.right, s.key)» (جانشین دوبار می‌ماند)', tags: ['d_rd'], keys: [50, 30, 70, 20, 40, 60, 80], op: 'delete', key: 50 }
+];
 
 function mount(view) {
   const $ = (s) => view.querySelector(s);
   const toast = (m) => window.appToast && window.appToast(m);
-  const S = { op: 'insert', tree: null, pre: null, nextId: 1, ctl: null };
+  /* state: حافظه‌ی پایدار درخت؛ pre: حالت پیش از آخرین عملیات؛ last: آخرین عملیات (برای اجرای دوباره پس از تغییر کد) */
+  const S = { op: 'insert', state: EMPTY(), pre: null, last: null, off: new Set(), ctl: null };
 
-  /* ----- تصویر درخت ----- */
-  function layoutTree(t) {
-    const out = []; let i = 0, maxD = 0;
-    (function go(n, d, p) {
-      if (!n) return;
-      go(n.l, d + 1, n.id);
-      out.push({ id: n.id, key: n.key, h: n.h, d, idx: i++, p }); maxD = Math.max(maxD, d);
-      go(n.r, d + 1, n.id);
-    })(t, 0, null);
-    return { nodes: out, maxD };
+  /* ----- تجزیه‌ی عکس‌فوری به گراف ----- */
+  function nodesOf(snap) {
+    const out = {};
+    Object.keys(snap.objs).forEach((id) => {
+      const o = snap.objs[id];
+      if (o.cls !== 'Node') return;
+      out[id] = { id: +id, key: numOf(o.a.key), h: numOf(o.a.height), l: ptr(o.a.left), r: ptr(o.a.right) };
+    });
+    return out;
   }
-  function drawTree(snap) {
+  const reprRep = (rep, snap) => {
+    if (!rep) return '?';
+    if (rep.k === 'none') return 'None';
+    if (rep.k === 'num') return String(rep.v);
+    if (rep.k === 'bool') return rep.v ? 'True' : 'False';
+    const o = snap.objs[rep.id];
+    return o ? o.cls + '(' + (numOf(o.a.key) === undefined ? '?' : numOf(o.a.key)) + ')' : 'Node';
+  };
+
+  /* چیدمان جنگل: درخت اصلی (از root) + زیردرخت‌های جدا از root که فقط متغیرهای محلی به آن‌ها اشاره می‌کنند */
+  function layout(snap, nodes) {
+    const placed = {}, trees = [];
+    let idx = 0;
+    const kids = (id) => [nodes[id].l, nodes[id].r].filter((x) => x !== null && nodes[x]);
+    function place(id, d, tr) {
+      placed[id] = { d, idx: -1, tree: tr };
+      const n = nodes[id];
+      if (n.l !== null && nodes[n.l] && !placed[n.l]) place(n.l, d + 1, tr);
+      placed[id].idx = idx++;
+      if (n.r !== null && nodes[n.r] && !placed[n.r]) place(n.r, d + 1, tr);
+    }
+    const reach = (id) => { const s = new Set(); (function g(i) { if (s.has(i)) return; s.add(i); kids(i).forEach(g); })(id); return s; };
+    const rid = ptr(snap.glob.root);
+    trees.push({ main: true, ids: [] });
+    if (rid !== null && nodes[rid]) place(rid, 0, 0);
+    /* نامزدهای جدا از root: گره‌هایی که متغیر محلی یا مقدار بازگشتی به آن‌ها اشاره می‌کند */
+    const cand = [];
+    const addC = (rep) => { const i = ptr(rep); if (i !== null && nodes[i] && !cand.includes(i)) cand.push(i); };
+    for (let f = snap.frames.length - 1; f >= 0; f--) Object.keys(snap.frames[f].vars).forEach((k) => addC(snap.frames[f].vars[k]));
+    addC(snap.ret);
+    const un = cand.filter((c) => !placed[c]);
+    const rs = {}; un.forEach((c) => { rs[c] = reach(c); });
+    const prim = un.filter((c) => !un.some((o) => o !== c && rs[o].has(c) && !rs[c].has(o)));
+    [...prim, ...un].forEach((c) => {
+      if (placed[c]) return;
+      if (idx > 0) idx += 0.7;
+      trees.push({ main: false });
+      place(c, 0, trees.length - 1);
+    });
+    Object.keys(placed).forEach((id) => { const t = trees[placed[id].tree]; (t.ids = t.ids || []).push(+id); });
+    return { placed, trees, width: idx };
+  }
+
+  function edgeSet(nodes) {
+    const s = new Set();
+    Object.keys(nodes).forEach((id) => { const n = nodes[id]; if (n.l !== null && nodes[n.l]) s.add(id + '>' + n.l + 'L'); if (n.r !== null && nodes[n.r]) s.add(id + '>' + n.r + 'R'); });
+    return s;
+  }
+
+  function drawTree(snap, prev) {
     const svg = $('#avsvg');
-    const { nodes, maxD } = layoutTree(snap.tree);
-    const W = Math.max(560, (nodes.length + 1) * 46), Hh = Math.max(230, (maxD + 1) * 76 + 40);
+    const nodes = nodesOf(snap), pn = prev ? nodesOf(prev) : {};
+    const ids = Object.keys(nodes);
+    const rid = ptr(snap.glob.root);
+    if (!ids.length) {
+      svg.setAttribute('viewBox', '0 0 560 230');
+      svg.innerHTML = '<text x="280" y="115" text-anchor="middle" style="fill:var(--mut);font-size:15px">درخت خالی است (root = None)</text>';
+      return;
+    }
+    const lay = layout(snap, nodes), P = lay.placed;
+    const maxD = Math.max(...Object.keys(P).map((i) => P[i].d));
+    const slots = Math.max(lay.width, 1);
+    const W = Math.max(560, (slots + 1) * 46), Hh = Math.max(230, (maxD + 1) * 76 + 66);
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Hh);
-    if (!nodes.length) { svg.innerHTML = '<text x="' + W / 2 + '" y="' + Hh / 2 + '" text-anchor="middle" style="fill:var(--mut);font-size:15px">درخت خالی است (root = None)</text>'; return; }
-    const dx = W / (nodes.length + 1);
+    const dx = W / (slots + 1);
     const pos = {};
-    nodes.forEach((n) => { pos[n.id] = { x: (n.idx + 1) * dx, y: 38 + n.d * 76 }; });
+    Object.keys(P).forEach((i) => { pos[i] = { x: (P[i].idx + 1) * dx, y: 38 + P[i].d * 76 }; });
     const roles = {};
-    Object.keys(snap.vars || {}).forEach((k) => { const v = snap.vars[k]; if (v.k === 'node') (roles[v.id] = roles[v.id] || []).push(k); });
+    const addRole = (rep, name) => { const i = ptr(rep); if (i !== null) (roles[i] = roles[i] || []).push(name); };
+    const top = snap.frames.length ? snap.frames[snap.frames.length - 1] : null;
+    if (top) Object.keys(top.vars).forEach((k) => addRole(top.vars[k], k));
+    addRole(snap.glob.root, 'root');
+    addRole(snap.ret, 'return');
+    const nowE = edgeSet(nodes), preE = edgeSet(pn);
     let s = '';
-    nodes.forEach((n) => { if (n.p != null) s += '<line class="avl-edge" x1="' + pos[n.p].x + '" y1="' + pos[n.p].y + '" x2="' + pos[n.id].x + '" y2="' + pos[n.id].y + '"/>'; });
-    nodes.forEach((n) => {
-      const p = pos[n.id], r = roles[n.id] || [];
-      const cls = 'avn' + (r.includes('n') ? ' cur' : (r.length ? ' ref' : '')) + (snap.mark.includes(n.id) ? ' mk' : '') + (snap.newId === n.id ? ' nw' : '');
-      s += '<g class="' + cls + '" transform="translate(' + p.x + ',' + p.y + ')"><circle class="c" r="19"/><text class="k" y="5">' + esc(n.key) + '</text><text class="h" y="34">h=' + n.h + '</text>' +
-        (r.length ? '<text class="v" y="-25">' + esc(r.join(',')) + '</text>' : '') +
-        (snap.bf && snap.bf.id === n.id ? '<text class="bf ' + (Math.abs(snap.bf.v) > 1 ? 'bad' : 'ok') + '" x="22" y="-8">bf=' + (snap.bf.v > 0 ? '+' : '') + snap.bf.v + '</text>' : '') + '</g>';
+    /* کادر زیردرخت‌های جدا از root */
+    lay.trees.forEach((t) => {
+      if (t.main || !t.ids || !t.ids.length) return;
+      const xs = t.ids.map((i) => pos[i].x), ys = t.ids.map((i) => pos[i].y);
+      const x0 = Math.min(...xs) - 30, x1 = Math.max(...xs) + 30, y1 = Math.max(...ys) + 62;
+      s += '<rect class="avdet" x="' + x0 + '" y="4" width="' + (x1 - x0) + '" height="' + (y1 - 4) + '" rx="12"/><text class="avcap" x="' + (x0 + x1) / 2 + '" y="' + (y1 - 3) + '">جدا از root (متغیر محلی)</text>';
+    });
+    if (rid === null) s += '<text x="10" y="16" style="fill:var(--err);font-size:12px;font-weight:700">root = None</text>';
+    /* یال‌های حذف‌شده در همین گام */
+    preE.forEach((e) => {
+      if (nowE.has(e)) return;
+      const m = /^(\d+)>(\d+)/.exec(e);
+      if (pos[m[1]] && pos[m[2]] && nodes[m[1]] && nodes[m[2]]) s += '<line class="avl-edge ghost" x1="' + pos[m[1]].x + '" y1="' + pos[m[1]].y + '" x2="' + pos[m[2]].x + '" y2="' + pos[m[2]].y + '"/>';
+    });
+    /* یال‌های فعلی */
+    ids.forEach((id) => {
+      const n = nodes[id];
+      [['l', 'L'], ['r', 'R']].forEach(([f, sd]) => {
+        const c = n[f];
+        if (c === null || !nodes[c] || !pos[id] || !pos[c]) return;
+        const tree = P[c].tree === P[id].tree && P[c].d === P[id].d + 1 && P[c].idx !== undefined;
+        const cls = 'avl-edge' + (preE.has(id + '>' + c + sd) ? '' : ' new') + (tree ? '' : ' cross');
+        s += '<line class="' + cls + '" x1="' + pos[id].x + '" y1="' + pos[id].y + '" x2="' + pos[c].x + '" y2="' + pos[c].y + '"/>';
+      });
+    });
+    ids.forEach((id) => {
+      const n = nodes[id], p = pos[id], r = roles[id] || [];
+      const isCur = r.includes('n') || r.includes('self');
+      const cls = 'avn' + (isCur ? ' cur' : (r.length ? ' ref' : '')) + (pn[id] ? '' : ' nw');
+      let bf = '';
+      if (top && top.vars.b && top.vars.b.k === 'num' && top.vars.n && ptr(top.vars.n) === +id) bf = '<text class="bf ' + (Math.abs(top.vars.b.v) > 1 ? 'bad' : 'ok') + '" x="22" y="-8">bf=' + (top.vars.b.v > 0 ? '+' : '') + top.vars.b.v + '</text>';
+      s += '<g class="' + cls + '" transform="translate(' + p.x + ',' + p.y + ')"><circle class="c" r="19"/><text class="k" y="5">' + (n.key === undefined ? '?' : esc(n.key)) + '</text><text class="h" y="34">h=' + (n.h === undefined ? '؟' : n.h) + '</text>' +
+        (r.length ? '<text class="v" y="-25">' + esc(r.join(',')) + '</text>' : '') + bf + '</g>';
     });
     svg.innerHTML = s;
   }
+
   function drawState(snap) {
-    const calls = snap.calls || [];
+    const calls = snap.frames.map((f) => f.label);
+    const st = { objs: snap.objs, glob: snap.glob };
+    const an = analyze(st);
     $('#avstate').innerHTML =
       '<div class="avrow"><span class="avlab">پشته‌ی فراخوانی: bottom → top</span><span class="avchips">' +
-      (calls.length ? calls.map((c, i) => '<span class="avchip' + (i === calls.length - 1 ? ' last' : '') + '">' + esc(c) + '</span>').join('') : '<span class="gundef" style="font-size:12px;color:var(--mut)">' + (snap.fin ? 'خالی — اجرا تمام شد' : '∅ خالی') + '</span>') + '</span></div>' +
-      '<div class="avrow"><span class="avlab">پیمایش میان‌ترتیب</span><span class="avchips">' + (inorder(snap.tree).map((k) => '<span class="avchip">' + esc(k) + '</span>').join('') || '<span style="font-size:12px;color:var(--mut)">—</span>') + '</span></div>' +
-      '<div class="avrow"><span class="avlab">گره‌ها / ارتفاع</span><b style="font-family:var(--mono);direction:ltr;unicode-bidi:isolate">' + count(snap.tree) + ' / ' + hgt(snap.tree) + '</b></div>';
+      (calls.length ? calls.map((c, i) => '<span class="avchip' + (i === calls.length - 1 ? ' last' : '') + '">' + esc(c) + '</span>').join('') : '<span style="font-size:12px;color:var(--mut)">' + (snap.fin ? 'خالی — اجرا تمام شد' : '∅ خالی') + '</span>') + '</span></div>' +
+      '<div class="avrow"><span class="avlab">پیمایش میان‌ترتیب</span><span class="avchips">' + (an.inorder.map((k) => '<span class="avchip">' + esc(k === undefined ? '?' : k) + '</span>').join('') || '<span style="font-size:12px;color:var(--mut)">—</span>') + '</span></div>' +
+      '<div class="avrow"><span class="avlab">گره‌ها / ارتفاع (از root)</span><b style="font-family:var(--mono);direction:ltr;unicode-bidi:isolate">' + an.count + ' / ' + an.height + '</b></div>';
   }
-  const repr = (v) => (v.k === 'none' ? 'None' : (v.k === 'num' ? String(v.v) : 'Node(' + v.key + ')'));
+
+  /* ----- غیرفعال‌سازی خط‌ها ----- */
+  const lineOf = (op, tag) => CODE[op].L[tag];
+  const indent = (t) => t.match(/^ */)[0].length;
+  function blockEnd(lines, i) {       /* خط‌های بدنه‌ی بلوکی که از i شروع می‌شود */
+    const ind = indent(lines[i]); const out = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!lines[j].trim()) { continue; }
+      if (indent(lines[j]) <= ind) break;
+      out.push(j);
+    }
+    return out;
+  }
+  function offSets(op) {
+    const lines = CODE[op].lines, own = new Set(), eff = new Set();
+    S.off.forEach((tag) => {
+      const i = lineOf(op, tag);
+      if (i === undefined) return;
+      own.add(i); eff.add(i);
+      blockEnd(lines, i).forEach((j) => eff.add(j));
+    });
+    return { own, eff };
+  }
+  const offFn = (op) => { const o = offSets(op).own; return (i) => o.has(i); };
+  function syncOffInfo() {
+    $('#offInfo').textContent = S.off.size ? '⚠ ' + S.off.size + ' خط غیرفعال' : '';
+  }
+  function toggleLine(i) {
+    const op = S.op, lines = CODE[op].lines;
+    if (!lines[i].trim()) return;
+    const tag = Object.keys(CODE[op].L).find((t) => CODE[op].L[t] === i);
+    if (!tag) return;
+    if (S.off.has(tag)) S.off.delete(tag); else S.off.add(tag);
+    syncOffInfo(); rerun();
+  }
+  /* پس از تغییر کد، آخرین عملیات از همان حالت قبلی دوباره اجرا می‌شود */
+  function rerun() {
+    if (S.last && S.pre) execOp(S.last.op, S.last.key, S.pre);
+    else ctl.refresh();
+  }
 
   /* ----- Stepper ----- */
+  const repr = (rep, snap) => reprRep(rep, snap);
   const ctl = Stepper.create(view, {
-    getCode: () => ({
-      tabs: [{ id: 'insert', label: 'insert(n, key)' }, { id: 'delete', label: 'delete(n, key)' }],
-      tab: S.op, lines: CODE[S.op].lines,
-      decl: '# درخت فعلی (پیش‌ترتیب): ' + (preorder(S.pre || S.tree).join(' ') || 'تهی') + '\nroot = ' + S.op + '(root, ' + ($('#keyIn').value.trim() || 'key') + ')'
-    }),
-    idle: () => ({ line: -1, note: '', snap: { tree: S.pre || S.tree, vars: {}, calls: [], bf: null, newId: null, mark: [], fin: false }, idle: true }),
+    getCode: () => {
+      const lines = CODE[S.op].lines, sets = offSets(S.op);
+      const tg = new Set(); lines.forEach((l, i) => { if (l.trim()) tg.add(i); });
+      const pre = S.pre || S.state;
+      return {
+        tabs: [{ id: 'insert', label: 'insert(n, key)' }, { id: 'delete', label: 'delete(n, key)' }],
+        tab: S.op, lines, off: sets.eff, offOwn: sets.own, toggle: tg,
+        decl: '# درخت پیش از اجرا (پیش‌ترتیب): ' + (preorderOf(pre).join(' ') || 'تهی') + '\nroot = ' + S.op + '(root, ' + ($('#keyIn').value.trim() || 'key') + ')'
+      };
+    },
+    onToggle: toggleLine,
+    idle: () => ({ line: -1, note: '', snap: snapOf(S.pre || S.state), idle: true }),
     watch: (step) => {
-      const v = (step.snap && step.snap.vars) || {};
-      const order = ['key', 'n', 'x', 'y', 's', 'b', 'root'];
-      const out = order.filter((k) => v[k]).map((k) => [k, repr(v[k])]);
-      const c = (step.snap && step.snap.calls) || [];
-      if (c.length > 1) out.push(['depth', String(c.length)]);
+      const sn = step.snap;
+      if (!sn) return [];
+      const out = [];
+      const fr = sn.frames.length ? sn.frames[sn.frames.length - 1] : null;
+      if (fr) Object.keys(fr.vars).forEach((k) => out.push([k, repr(fr.vars[k], sn)]));
+      out.push(['root', repr(sn.glob.root, sn)]);
+      if (sn.frames.length > 1) out.push(['depth', String(sn.frames.length)]);
       return out;
     },
-    render: (step) => { drawTree(step.snap); drawState(step.snap); },
+    render: (step, prev) => { drawTree(step.snap, prev && prev.snap); drawState(step.snap); },
     onTab: (id) => { S.op = id; syncOp(); },
     traceOpen: false,
     hint: 'عملیات و کلید را انتخاب و «اجرای عملیات» را بزنید؛ سپس با «بعدی» یا «پخش» مراحل را دنبال کنید.'
   });
+  const snapOf = (st) => ({ objs: st.objs, glob: st.glob, frames: [], ret: null, fin: false, err: null });
+  function preorderOf(st) {
+    const out = [], seen = new Set();
+    (function g(id) { if (id === null || seen.has(id) || !st.objs[id]) return; seen.add(id); const a = st.objs[id].a; out.push(numOf(a.key) === undefined ? '?' : numOf(a.key)); g(ptr(a.left)); g(ptr(a.right)); })(rootOf(st));
+    return out;
+  }
 
   function syncOp() {
     view.querySelectorAll('#segOp button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.op));
     ctl.refresh();
   }
-  function info() { $('#avInfo').textContent = count(S.tree) + ' گره · ارتفاع ' + hgt(S.tree); }
-  function resetSteps() { S.pre = null; ctl.setSteps([], S.op, CODE[S.op].lines); }
+  function info() { const an = analyze(S.state); $('#avInfo').textContent = an.count + ' گره · ارتفاع ' + an.height; }
+  function resetSteps() { S.pre = null; S.last = null; ctl.setSteps([], S.op, CODE[S.op].lines); }
 
   function setTree(keys) {
-    S.tree = null; S.nextId = 1;
-    for (const k of keys) { const r = run('insert', S.tree, k, S.nextId, true); S.tree = r.tree; S.nextId = r.nextId; }
+    S.state = EMPTY();
+    for (const k of keys) S.state = run('insert', S.state, k, { silent: true, deep: false }).state;   /* ساخت با کد کامل (بدون خط‌های غیرفعال) */
     info(); resetSteps();
   }
-  function parseKeys(str) {
-    return str.split(/[\s,،;]+/).filter(Boolean).map(Number);
-  }
+  const parseKeys = (str) => str.split(/[\s,،;]+/).filter(Boolean).map(Number);
   const okKey = (k) => Number.isInteger(k) && k >= -999 && k <= 999;
 
+  function execOp(op, k, pre) {
+    const r = run(op, pre, k, { deep: $('#deepChk').checked, off: offFn(op) });
+    S.pre = pre; S.state = r.state; S.last = { op, key: k };
+    info();
+    ctl.setSteps(r.steps, op, CODE[op].lines);
+    if (r.err) toast('خطای پایتون: ' + r.err);
+  }
   function doOp() {
     const k = Number($('#keyIn').value.trim());
     if ($('#keyIn').value.trim() === '' || !okKey(k)) { toast('یک عدد صحیح (بین ‎−۹۹۹ تا ۹۹۹) به‌عنوان کلید وارد کنید.'); return; }
-    if (S.op === 'insert' && count(S.tree) >= MAX_NODES && !inorder(S.tree).includes(k)) { toast('حداکثر ' + MAX_NODES + ' گره پشتیبانی می‌شود.'); return; }
-    const pre = S.tree;
-    const r = run(S.op, S.tree, k, S.nextId, false, $('#deepChk').checked);
-    S.tree = r.tree; S.nextId = r.nextId;
-    S.pre = pre;
-    info();
-    ctl.setSteps(r.steps, S.op, CODE[S.op].lines);
+    const an = analyze(S.state);
+    if (S.op === 'insert' && an.count >= MAX_NODES && !an.inorder.includes(k)) { toast('حداکثر ' + MAX_NODES + ' گره پشتیبانی می‌شود.'); return; }
+    execOp(S.op, k, S.state);
   }
 
   /* ----- رویدادها ----- */
@@ -511,6 +479,7 @@ function mount(view) {
   $('#btnRun').addEventListener('click', doOp);
   $('#keyIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') doOp(); });
   $('#keyIn').addEventListener('input', () => ctl.refresh());
+  $('#deepChk').addEventListener('change', () => { if (S.last && S.pre) rerun(); });
   $('#btnEmpty').addEventListener('click', () => { setTree([]); $('#preset').value = '0'; });
   $('#btnBuild').addEventListener('click', () => {
     const ks = parseKeys($('#bulk').value);
@@ -528,6 +497,15 @@ function mount(view) {
     S.op = p.op; $('#keyIn').value = String(p.key); $('#bulk').value = p.keys.join(',');
     setTree(p.keys); syncOp();
   });
+  $('#exper').innerHTML = EXPERS.map((p, i) => '<option value="' + i + '">' + esc(p.name) + '</option>').join('');
+  $('#exper').addEventListener('change', (e) => {
+    const x = EXPERS[+e.target.value];
+    S.off = new Set(x.tags); syncOffInfo();
+    if (!x.tags.length) { rerun(); return; }
+    S.op = x.op; $('#keyIn').value = String(x.key); $('#bulk').value = x.keys.join(',');
+    setTree(x.keys); syncOp(); doOp();
+  });
+  $('#btnAllOn').addEventListener('click', () => { S.off = new Set(); $('#exper').value = '0'; syncOffInfo(); rerun(); });
 
   /* ----- شروع ----- */
   $('#preset').value = '1';
@@ -538,10 +516,10 @@ function mount(view) {
 window.Shell.register({
   id: 'avl',
   title: 'شبیه‌ساز درج و حذف در درخت AVL',
-  subtitle: 'گره‌های پیوندی با فرزند چپ و راست — اجرای گام‌به‌گام شبه‌کد پایتون',
+  subtitle: 'اجرای واقعیِ شبه‌کد پایتون روی گره‌های پیوندی — با امکان غیرفعال‌کردن خط‌های کد',
   css: CSS,
   html: HTML,
   mount: mount,
-  engine: { run, CODE, inorder, count, hgt }
+  engine: { run, analyze, CODE, EMPTY }
 });
 })();
