@@ -192,7 +192,7 @@
     teardown();
     view.innerHTML = '<div class="loading">در حال بارگذاری…</div>';
     try {
-      if (!sims[id]) { await loadScript('lib/follow.js'); for (const d of (item.deps || [])) await loadScript(d); await loadScript(item.file); }
+      if (!sims[id]) { await loadScript('lib/follow.js'); await loadScript('lib/panzoom.js'); for (const d of (item.deps || [])) await loadScript(d); await loadScript(item.file); }
       if (!sims[id]) throw new Error('not registered');
     } catch (e) {
       if (my === seq) view.innerHTML = '<div class="loading err">بارگذاری این شبیه‌ساز ممکن نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.</div>';
@@ -211,6 +211,7 @@
     current = { id, def, style, inst: null };
     current.inst = def.mount(view);
     mountFontCtl(view);
+    view.querySelectorAll('.gsvg svg, .avsvg svg, .am-svg svg').forEach((v) => { try { window.PanZoom && PanZoom.attach(v); } catch (e) { /* ignore */ } });
     updTc();
     if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
     markActive();
