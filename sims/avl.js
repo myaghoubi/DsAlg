@@ -93,7 +93,14 @@ function analyze(st) {
 /* اجرای یک عملیات: o = { deep, off:(lineIdx)=>bool, silent } ← { steps, state, err } */
 function run(op, state, key, o) {
   o = o || {};
-  const prog = MiniPy.parse(CODE[op].lines, o.off || (() => false));
+  const lines = o.lines || CODE[op].lines;
+  let prog;
+  try { prog = MiniPy.parse(lines, o.off || (() => false)); }
+  catch (e) {
+    if (!(e instanceof MiniPy.PyErr)) throw e;
+    const msg = e.pyName + (e.line !== undefined ? ' (خط ' + (e.line + 1) + ')' : '') + ': ' + e.pyMsg;
+    return { steps: [], state, err: msg, syntax: true };
+  }
   const steps = [];
   const vm = MiniPy.createVM(prog, {
     deep: o.deep !== false, atomic: ATOMIC, nextId: state.nextId, record: !o.silent, maxSteps: o.silent ? Infinity : 5000,
@@ -113,7 +120,7 @@ function run(op, state, key, o) {
     if (e instanceof MiniPy.PyErr) err = e.pyName + ': ' + e.pyMsg;
     else if (e instanceof MiniPy.Limit) err = 'LimitError: تعداد گام‌های اجرا از حد مجاز گذشت (حلقه یا بازگشت بی‌پایان؟)';
     else throw e;
-    vm.emitError(vm.errorLine() >= 0 ? vm.errorLine() : CODE[op].L[op === 'insert' ? 'i_def' : 'd_def'], '❌ ' + err + ' — اجرا در همین خط متوقف شد؛ root تغییر نکرد (ولی تغییرهایی که تا اینجا روی گره‌ها داده شده می‌ماند).', { err, fin: true });
+    vm.emitError(vm.errorLine() >= 0 ? vm.errorLine() : Math.max(0, lines.findIndex((l) => l.indexOf('def ' + op + '(') === 0)), '❌ ' + err + ' — اجرا در همین خط متوقف شد؛ root تغییر نکرد (ولی تغییرهایی که تا اینجا روی گره‌ها داده شده می‌ماند).', { err, fin: true });
   }
   const ns = vm.snapshot({ noFrames: true }); ns.nextId = vm.nextId();
   return { steps, state: ns, err };
@@ -194,14 +201,12 @@ const HTML = `
         <button class="btn" id="btnRand">تصادفی</button>
         <button class="btn" id="btnEmpty">خالی</button>
       </div>
-      <div class="row"><span class="lbl">آزمایش با کد</span>
-        <select id="exper" aria-label="آزمایش غیرفعال‌کردن خط‌های کد"></select>
-        <button class="btn" id="btnAllOn">فعال‌سازی همه‌ی خط‌ها</button>
-        <span class="avoff" id="offInfo"></span>
+      <div class="row"><span class="lbl">نمونه تغییر کد</span>
+        <select id="exper" aria-label="نمونه تغییر کد"></select>
       </div>
     </div>
   </section>
-` + Stepper.layout(STAGE, { codeNote: 'درخت دقیقاً نتیجه‌ی اجرای همین کد است. برای غیرفعال‌کردن (کامنت‌کردن) یک خط یا یک بلوک، روی ☑ کنار شماره‌ی خط بزنید؛ اجرا از نو با کد تازه انجام می‌شود و اثرش (یا خطای پایتون) در درخت دیده می‌شود.' });
+` + Stepper.layout(STAGE, { codeNote: 'درخت دقیقاً نتیجه‌ی اجرای همین کد است. با «✎ ویرایش کد» هر خط را تغییر دهید (یا با # کامنت کنید)؛ پس از «اعمال»، عملیات از نو با کد تازه اجرا می‌شود و اثرش (یا خطای پایتون) در درخت دیده می‌شود.' });
 
 /* ===================== رابط کاربری ===================== */
 const PRESETS = [
@@ -214,9 +219,9 @@ const PRESETS = [
   { name: 'حذف گره دوفرزندی: حذف ۵۰', keys: [50, 30, 70, 20, 40, 60, 80], op: 'delete', key: 50 },
   { name: 'درخت ۱۰ کلیدی', keys: [50, 25, 75, 12, 37, 62, 87, 6, 18, 31], op: 'insert', key: 22 }
 ];
-/* آزمایش‌ها: چند خط از کد غیرفعال می‌شود تا اثر آن در درخت دیده شود */
+/* نمونه تغییرهای کد: هر خطِ فهرست‌شده با «pass  # خط اصلی» جایگزین می‌شود */
 const EXPERS = [
-  { name: '— کد کامل (بدون آزمایش) —', tags: [] },
+  { name: '— کد اصلی —', tags: [] },
   { name: 'بدون update پس از چرخش (ارتفاع‌ها کهنه می‌مانند)', tags: ['rr_uy', 'rr_ux', 'rl_ux', 'rl_uy'], keys: [30, 20, 40, 10], op: 'insert', key: 5 },
   { name: 'بدون «x.right = y» در rotate_right (y از درخت جدا می‌شود)', tags: ['rr_xr'], keys: [30, 20, 40, 10], op: 'insert', key: 5 },
   { name: 'بدون «y.left = x.right» (یک زیردرخت گم می‌شود)', tags: ['rr_yl'], keys: [40, 20, 50, 10, 30], op: 'insert', key: 5 },
@@ -232,7 +237,7 @@ function mount(view) {
   const $ = (s) => view.querySelector(s);
   const toast = (m) => window.appToast && window.appToast(m);
   /* state: حافظه‌ی پایدار درخت؛ pre: حالت پیش از آخرین عملیات؛ last: آخرین عملیات (برای اجرای دوباره پس از تغییر کد) */
-  const S = { op: 'insert', state: EMPTY(), pre: null, last: null, off: new Set(), ctl: null };
+  const S = { op: 'insert', state: EMPTY(), pre: null, last: null, ctl: null, src: { insert: CODE.insert.lines.slice(), delete: CODE.delete.lines.slice() } };
 
   /* ----- تجزیه‌ی عکس‌فوری به گراف ----- */
   function nodesOf(snap) {
@@ -367,39 +372,50 @@ function mount(view) {
       '<div class="avrow"><span class="avlab">گره‌ها / ارتفاع (از root)</span><b style="font-family:var(--mono);direction:ltr;unicode-bidi:isolate">' + an.count + ' / ' + an.height + '</b></div>';
   }
 
-  /* ----- غیرفعال‌سازی خط‌ها ----- */
-  const lineOf = (op, tag) => CODE[op].L[tag];
-  const indent = (t) => t.match(/^ */)[0].length;
-  function blockEnd(lines, i) {       /* خط‌های بدنه‌ی بلوکی که از i شروع می‌شود */
-    const ind = indent(lines[i]); const out = [];
-    for (let j = i + 1; j < lines.length; j++) {
-      if (!lines[j].trim()) { continue; }
-      if (indent(lines[j]) <= ind) break;
-      out.push(j);
+  /* ----- ویرایش کد ----- */
+  const markerRe = (op) => (op === 'insert' ? /^def insert\(/ : /^def min_node\(/);
+  const markerIdx = (lines, op) => lines.findIndex((l) => markerRe(op).test(l));
+  const srcText = (op) => S.src[op].join('\n');
+  const isModified = () => srcText('insert') !== CODE.insert.lines.join('\n') || srcText('delete') !== CODE.delete.lines.join('\n');
+  const toLines = (text) => text.replace(/\r/g, '').replace(/\t/g, '    ').split('\n').map((l) => l.replace(/\s+$/, ''));
+  const errMsg = (e) => e.pyName + (e.line !== undefined ? ' (خط ' + (e.line + 1) + ')' : '') + ': ' + e.pyMsg;
+  function checkText(text) {
+    try { MiniPy.parse(toLines(text), () => false); return { ok: true }; }
+    catch (e) { return { ok: false, msg: e instanceof MiniPy.PyErr ? errMsg(e) : 'کد قابل تحلیل نیست.' }; }
+  }
+  /* بخش مشترک (کلاس و توابع کمکی) بین زبانه‌ی insert و delete یکی است؛ ویرایش آن در هر دو اعمال می‌شود */
+  function saveSrc(op, lines) {
+    const other = op === 'insert' ? 'delete' : 'insert';
+    const mi = markerIdx(lines, op), mo = markerIdx(S.src[other], other);
+    let next = null;
+    if (mi > 0 && mo > 0) {
+      next = lines.slice(0, mi).concat(S.src[other].slice(mo));
+      try { MiniPy.parse(next, () => false); }
+      catch (e) { return { ok: false, msg: 'این تغییرِ بخش مشترک با کد زبانه‌ی ' + other + ' سازگار نیست (' + (e.pyMsg || '') + ').' }; }
     }
-    return out;
+    S.src[op] = lines;
+    if (next) S.src[other] = next;
+    return { ok: true };
   }
-  function offSets(op) {
-    const lines = CODE[op].lines, own = new Set(), eff = new Set();
-    S.off.forEach((tag) => {
-      const i = lineOf(op, tag);
-      if (i === undefined) return;
-      own.add(i); eff.add(i);
-      blockEnd(lines, i).forEach((j) => eff.add(j));
-    });
-    return { own, eff };
+  function applyText(text) {
+    const c = checkText(text);
+    if (!c.ok) return c;
+    const r = saveSrc(S.op, toLines(text));
+    if (!r.ok) return r;
+    rerun();
+    return { ok: true };
   }
-  const offFn = (op) => { const o = offSets(op).own; return (i) => o.has(i); };
-  function syncOffInfo() {
-    $('#offInfo').textContent = S.off.size ? '⚠ ' + S.off.size + ' خط غیرفعال' : '';
+  function resetSrc() {
+    S.src = { insert: CODE.insert.lines.slice(), delete: CODE.delete.lines.slice() };
+    $('#exper').value = '0';
+    rerun();
   }
-  function toggleLine(i) {
-    const op = S.op, lines = CODE[op].lines;
-    if (!lines[i].trim()) return;
-    const tag = Object.keys(CODE[op].L).find((t) => CODE[op].L[t] === i);
-    if (!tag) return;
-    if (S.off.has(tag)) S.off.delete(tag); else S.off.add(tag);
-    syncOffInfo(); rerun();
+  function applyExperiment(tags) {
+    S.src = { insert: CODE.insert.lines.slice(), delete: CODE.delete.lines.slice() };
+    ['insert', 'delete'].forEach((op) => tags.forEach((t) => {
+      const i = CODE[op].L[t];
+      if (i !== undefined) { const l = CODE[op].lines[i]; S.src[op][i] = l.match(/^ */)[0] + 'pass  # ' + l.trim(); }
+    }));
   }
   /* پس از تغییر کد، آخرین عملیات از همان حالت قبلی دوباره اجرا می‌شود */
   function rerun() {
@@ -411,16 +427,15 @@ function mount(view) {
   const repr = (rep, snap) => reprRep(rep, snap);
   const ctl = Stepper.create(view, {
     getCode: () => {
-      const lines = CODE[S.op].lines, sets = offSets(S.op);
-      const tg = new Set(); lines.forEach((l, i) => { if (l.trim()) tg.add(i); });
+      const lines = S.src[S.op];
       const pre = S.pre || S.state;
       return {
         tabs: [{ id: 'insert', label: 'insert(n, key)' }, { id: 'delete', label: 'delete(n, key)' }],
-        tab: S.op, lines, off: sets.eff, offOwn: sets.own, toggle: tg,
+        tab: S.op, lines,
         decl: '# درخت پیش از اجرا (پیش‌ترتیب): ' + (preorderOf(pre).join(' ') || 'تهی') + '\nroot = ' + S.op + '(root, ' + ($('#keyIn').value.trim() || 'key') + ')'
       };
     },
-    onToggle: toggleLine,
+    edit: { get: () => srcText(S.op), check: checkText, apply: applyText, reset: resetSrc, modified: isModified },
     idle: () => ({ line: -1, note: '', snap: snapOf(S.pre || S.state), idle: true }),
     watch: (step) => {
       const sn = step.snap;
@@ -449,21 +464,22 @@ function mount(view) {
     ctl.refresh();
   }
   function info() { const an = analyze(S.state); $('#avInfo').textContent = an.count + ' گره · ارتفاع ' + an.height; }
-  function resetSteps() { S.pre = null; S.last = null; ctl.setSteps([], S.op, CODE[S.op].lines); }
+  function resetSteps() { S.pre = null; S.last = null; ctl.setSteps([], S.op, S.src[S.op]); }
 
   function setTree(keys) {
     S.state = EMPTY();
-    for (const k of keys) S.state = run('insert', S.state, k, { silent: true, deep: false }).state;   /* ساخت با کد کامل (بدون خط‌های غیرفعال) */
+    for (const k of keys) S.state = run('insert', S.state, k, { silent: true, deep: false }).state;   /* ساخت سریع همیشه با کد اصلی */
     info(); resetSteps();
   }
   const parseKeys = (str) => str.split(/[\s,،;]+/).filter(Boolean).map(Number);
   const okKey = (k) => Number.isInteger(k) && k >= -999 && k <= 999;
 
   function execOp(op, k, pre) {
-    const r = run(op, pre, k, { deep: $('#deepChk').checked, off: offFn(op) });
+    const lines = S.src[op];
+    const r = run(op, pre, k, { deep: $('#deepChk').checked, lines });
     S.pre = pre; S.state = r.state; S.last = { op, key: k };
     info();
-    ctl.setSteps(r.steps, op, CODE[op].lines);
+    ctl.setSteps(r.steps, op, lines);
     if (r.err) toast('خطای پایتون: ' + r.err);
   }
   function doOp() {
@@ -500,12 +516,11 @@ function mount(view) {
   $('#exper').innerHTML = EXPERS.map((p, i) => '<option value="' + i + '">' + esc(p.name) + '</option>').join('');
   $('#exper').addEventListener('change', (e) => {
     const x = EXPERS[+e.target.value];
-    S.off = new Set(x.tags); syncOffInfo();
+    applyExperiment(x.tags);
     if (!x.tags.length) { rerun(); return; }
     S.op = x.op; $('#keyIn').value = String(x.key); $('#bulk').value = x.keys.join(',');
     setTree(x.keys); syncOp(); doOp();
   });
-  $('#btnAllOn').addEventListener('click', () => { S.off = new Set(); $('#exper').value = '0'; syncOffInfo(); rerun(); });
 
   /* ----- شروع ----- */
   $('#preset').value = '1';
