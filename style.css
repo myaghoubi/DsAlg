@@ -202,6 +202,8 @@ pre#code{max-height:46vh;overflow-y:auto}
 .m-head em.lk,.m-item em.lk{font-style:normal;font-size:11px;border:1px solid var(--bd);border-radius:999px;padding:0 8px;white-space:nowrap;margin-inline-start:auto;margin-inline-end:6px}
 .m-head em.lk.ok,.m-item em.lk.ok{color:var(--ok);border-color:var(--ok)}
 .m-item.locked span{opacity:.6}
+#trBtn{border-color:var(--warn);color:var(--warn);font-weight:700}
+.lic-hint.warn{color:var(--warn)}
 #tcBtn{border-color:var(--acc2);color:var(--acc2);font-weight:700}
 .lic-back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px}
 .lic-box{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:16px;padding:12px 16px;width:min(94vw,440px);max-height:92vh;overflow:auto;display:flex;flex-direction:column;gap:8px}

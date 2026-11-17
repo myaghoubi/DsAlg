@@ -222,7 +222,15 @@
   function updTc() {
     const it = current && find(current.id);
     tcBtn.hidden = !(it && it.ci !== undefined && Lic.isTeacher(it.ci));
+    trBtn.hidden = !(it && it.ci !== undefined && Lic.grantEnd(it.ci, it.id) > 0);
   }
+  const trBtn = $('#trBtn');
+  window.__loadTr = async () => { await loadScript('lib/qr.js'); await loadScript('lib/transfer.js'); };
+  trBtn.addEventListener('click', async () => {
+    const it = current && find(current.id); if (!it) return;
+    try { await loadScript('lib/qr.js'); await loadScript('lib/transfer.js'); window.TransferUI.open(it.id, it.title, false); }
+    catch (e) { window.appToast('بارگذاری پنجره‌ی انتقال ممکن نشد.'); }
+  });
   tcBtn.addEventListener('click', async () => {
     const it = current && find(current.id); if (!it) return;
     try { await loadScript('lib/qr.js'); await loadScript('lib/timecode.js'); window.TimeCodeUI.open(it.ci, it.id, it.title); }
@@ -232,7 +240,7 @@
   /* کد زمانیِ آمده از پیوند (#tc=...) */
   async function handleTc(h) {
     let r;
-    try { r = await Lic.redeem(h.slice(3)); }
+    try { r = h.startsWith('tr=') ? await Lic.acceptTransfer(h) : await Lic.redeem(h.slice(3)); }
     catch (e) { r = { ok: false, msg: 'این مرورگر از رمزنگاری امن پشتیبانی نمی‌کند (آدرس باید https باشد؛ پیوند را در Chrome یا Safari باز کنید، نه داخل برنامه‌ی پیام‌رسان).' }; }
     if (r.ok && r.topicId) { window.appToast('مبحث برای شما باز شد (تا ' + (r.endMs - Lic.now() > 20 * 36e5 ? new Date(r.endMs).toLocaleDateString('fa-IR') : 'ساعت ' + new Date(r.endMs).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })) + ').'); history.replaceState(null, '', '#' + r.topicId); return open(r.topicId); }
     window.appTcMsg = r.msg || 'کد زمانی معتبر نیست.';          /* در صفحه‌ی فعال‌سازی، ماندگار نمایش داده می‌شود */
@@ -241,7 +249,7 @@
   }
   function route() {
     const h = location.hash.replace(/^#/, '');
-    if (h.startsWith('tc=')) return handleTc(h);
+    if (h.startsWith('tc=') || h.startsWith('tr=')) return handleTc(h);
     return open(h);
   }
   window.addEventListener('hashchange', route);
@@ -277,7 +285,7 @@
     try { await Lic.ready; } catch (e) { /* ignore */ }
     renderMenu();
     const start = location.hash.replace(/^#/, '');
-    if (start.startsWith('tc=')) return handleTc(start);
+    if (start.startsWith('tc=') || start.startsWith('tr=')) return handleTc(start);
     open(find(start) && !find(start).soon ? start : DEFAULT_ID);
   })();
 })();
