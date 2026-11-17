@@ -50,10 +50,12 @@ function mount(view) {
         '<div class="row"><button class="btn pri ac" data-c="' + c.idx + '">فعال‌سازی</button><span class="msg ' + (msgs[c.idx] ? msgs[c.idx].t : '') + '" id="m' + c.idx + '">' + esc(msgs[c.idx] ? msgs[c.idx].m : (f ? 'برای دسترسی به این درس، کد فعال‌سازی را وارد کنید.' : '')) + '</span></div></section>';
     });
     h += '<section class="card"><h2><span>🕒 کد زمانیِ استاد</span></h2>' +
-      '<p class="nt">اگر استاد در کلاس یک کد زمانی نمایش داد (QR یا متن)، آن را اینجا وارد کنید (کد فقط چند دقیقه معتبر است) تا فقط همان مبحث، برای مدتی که استاد تعیین کرده، برایتان باز شود. (اسکن QR با دوربین گوشی هم مستقیم همین کار را می‌کند.)</p>' +
+      '<p class="nt">اگر استاد در کلاس یک کد زمانی نمایش داد (QR یا متن) یا پیوند «انتقال اعتبار» از دستگاه دیگر دارید، آن را اینجا وارد کنید (کد فقط چند دقیقه معتبر است) تا فقط همان مبحث، برای مدتی که استاد تعیین کرده، برایتان باز شود. (اسکن QR با دوربین گوشی هم مستقیم همین کار را می‌کند.)</p>' +
       '<textarea id="tcIn" rows="3" placeholder="کد زمانی (DST1-…) یا پیوند">' + esc(vals.tcIn || '') + '</textarea>' +
       '<div class="row"><button class="btn sec" id="tcGo">باز کردن مبحث</button><span class="msg ' + (msgs.tc ? msgs.tc.t : '') + '" id="mtc">' + esc(msgs.tc ? msgs.tc.m : '') + '</span></div>';
     if (gr.length) h += '<p class="nt">دسترسی‌های موقت فعال:</p>' + gr.map((g) => { const c = C[g.course]; return '<p class="nt">• ' + esc(c ? c.title : '') + ' — «' + esc(c ? c.topics[g.topic] : '') + '» تا ' + (g.endMs - L.now() > 20 * 36e5 ? dt(g.endMs) : 'ساعت ' + tm(g.endMs)) + '</p>'; }).join('');
+    const mv = L.moved();
+    if (mv.length) h += '<p class="nt">مبحث‌های منتقل‌شده به دستگاه دیگر (روی این دستگاه غیرفعال‌اند):</p>' + mv.map((g, i) => { const c = C[g.course]; return '<p class="nt">• ' + esc(c ? c.title : '') + ' — «' + esc(c ? c.topics[g.topic] : '') + '» <button class="btn sec shq" data-i="' + i + '">نمایش QR انتقال</button></p>'; }).join('');
     h += '</section>';
     root.innerHTML = h;
     if (focus) { const el = root.querySelector('#c' + focus.ci); if (el && !root._f) { root._f = 1; el.scrollIntoView({ block: 'center' }); } }
@@ -70,8 +72,12 @@ function mount(view) {
       if (r.ok) { vals['code' + ci] = ''; msgs[ci] = { t: 'ok', m: '✓ فعال شد: ' + nameOf(r) + ' — ' + (r.role === 1 ? 'استاد' : 'دانشجو') }; }
       else { vals['code' + ci] = ta.value; msgs[ci] = { t: 'err', m: '✗ ' + r.msg }; }
       render();
+    } else if (t.classList.contains('shq')) {
+      const g = L.moved()[+t.dataset.i]; if (!g) return;
+      try { await window.__loadTr(); window.TransferUI.open(C[g.course].topics[g.topic], C[g.course].title + ' — ' + C[g.course].topics[g.topic], true); } catch (x) { window.appToast('بارگذاری ممکن نشد.'); }
     } else if (t.id === 'tcGo') {
-      const r = await L.redeem(root.querySelector('#tcIn').value);
+      const txt = root.querySelector('#tcIn').value;
+      const r = /tr=/.test(txt) ? await L.acceptTransfer(txt) : await L.redeem(txt);
       if (r.ok) { msgs.tc = { t: 'ok', m: '✓ مبحث باز شد.' }; vals.tcIn = ''; render(); location.hash = r.topicId; }
       else { vals.tcIn = root.querySelector('#tcIn').value; msgs.tc = { t: 'err', m: '✗ ' + r.msg }; render(); }
     }
