@@ -517,8 +517,9 @@ function mount(view) {
       Object.keys(nodeEls).forEach((id) => nodeEls[id].g.classList.toggle('tgt', !!t && t.id === id));
       return;
     }
-    n.x = Math.max(R + 2, Math.min(VW - R - 2, p.x + drag.dx));
-    n.y = Math.max(R + 2, Math.min(VH - R - 2, p.y + drag.dy));
+    const bd = (window.PanZoom && PanZoom.bounds(svg)) || { x0: 0, y0: 0, x1: VW, y1: VH };
+    n.x = Math.max(bd.x0 + R + 2, Math.min(bd.x1 - R - 2, p.x + drag.dx));
+    n.y = Math.max(bd.y0 + R + 2, Math.min(bd.y1 - R - 2, p.y + drag.dy));
     layout();
   });
   const endDrag = (e) => {
