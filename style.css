@@ -76,7 +76,7 @@ input[type=text]{width:64px;text-align:center;direction:ltr}
 .tabs button{border:1px solid var(--bd);background:transparent;padding:1px 10px;border-radius:8px;cursor:pointer;direction:ltr;font-family:var(--mono);font-size:12.5px}
 .tabs button.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
 pre.code{margin:0;background:var(--codebg);color:var(--codetx);border-radius:10px;padding:6px 0;overflow-x:auto;direction:ltr;text-align:left;
-  font-family:var(--mono);font-size:12.5px;line-height:1.75}
+  font-family:var(--mono);font-size:var(--codefs,12.5px);line-height:1.75}
 .ln{display:block;min-width:100%;width:max-content;padding:0 10px 0 0;white-space:pre;border-right:3px solid transparent;unicode-bidi:plaintext}
 .ln i{display:inline-block;width:2em;text-align:right;color:#64748b;font-style:normal;margin-right:8px;user-select:none}
 .ln.cur{background:var(--codehl);border-right-color:#60a5fa}
@@ -218,3 +218,9 @@ pre#code{max-height:46vh;overflow-y:auto}
 .ln .tg{display:inline-block;width:1.7em;text-align:center;cursor:pointer;color:#93c5fd;font-weight:400;user-select:none;margin-right:2px;padding:0 3px}
 .ln .tg.ph{cursor:default}.ln .tg.inh{opacity:.35;cursor:default}
 .ln.off{opacity:.45}.ln.off .tg{color:#fca5a5;opacity:1}.ln.off .tg.inh{opacity:.4}
+
+/* ---- اندازه‌ی فونت ناحیه‌ی کد (v3.4) ---- */
+.cfont{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-bottom:4px;font-size:12px;color:var(--mut)}
+.cfont button{border:1px solid var(--bd);background:transparent;color:var(--tx);border-radius:8px;min-width:34px;height:26px;cursor:pointer;font-family:var(--mono);font-weight:700;padding:0 6px}
+.cfont button:disabled{opacity:.35;cursor:default}
+.cfont output{min-width:2.8em;text-align:center;font-family:var(--mono);direction:ltr;unicode-bidi:isolate}

@@ -41,6 +41,36 @@
   const Lic = window.License;
   const licOK = (it) => it.ci === undefined || Lic.can(it.ci, it.id);
 
+  /* ---------- اندازه‌ی فونت ناحیه‌ی کد (مشترک بین همه‌ی شبیه‌سازهای دارای کد) ---------- */
+  const FS_MIN = 9, FS_MAX = 26, FS_DEF = 12.5;
+  let codeFs = FS_DEF;
+  try { const v = parseFloat(localStorage.getItem('ds_codefs')); if (v >= FS_MIN && v <= FS_MAX) codeFs = v; } catch (e) { /* ignore */ }
+  const applyFs = () => document.documentElement.style.setProperty('--codefs', codeFs + 'px');
+  applyFs();
+  function mountFontCtl(v) {
+    const pane = v.querySelector('#paneCode');
+    if (!pane || pane.querySelector('.cfont')) return;
+    const d = document.createElement('div');
+    d.className = 'cfont';
+    d.innerHTML = '<span>اندازه‌ی فونت کد</span><button type="button" data-d="-1" aria-label="کوچک‌تر کردن فونت کد">A−</button><output></output><button type="button" data-d="1" aria-label="بزرگ‌تر کردن فونت کد">A+</button><button type="button" data-d="0" aria-label="اندازه‌ی پیش‌فرض" title="اندازه‌ی پیش‌فرض">⟲</button>';
+    pane.insertBefore(d, pane.firstChild);
+    const upd = () => {
+      d.querySelector('output').textContent = Math.round(codeFs / FS_DEF * 100) + '٪';
+      d.querySelector('[data-d="-1"]').disabled = codeFs <= FS_MIN;
+      d.querySelector('[data-d="1"]').disabled = codeFs >= FS_MAX;
+    };
+    d.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = +b.dataset.d;
+      codeFs = k === 0 ? FS_DEF : Math.min(FS_MAX, Math.max(FS_MIN, codeFs + k));
+      applyFs(); upd();
+      try { localStorage.setItem('ds_codefs', String(codeFs)); } catch (x) { /* ignore */ }
+      const cur = v.querySelector('#code .ln.cur');        /* پس از تغییر اندازه، خط فعال در دید بماند */
+      if (cur && window.Follow) setTimeout(() => window.Follow.revealLine(cur), 50);
+    });
+    upd();
+  }
+
   const sims = {};            /* id → تعریفی که فایل شبیه‌ساز ثبت کرده */
   let current = null;         /* { id, def, inst, style } */
   let seq = 0;                /* برای نادیده گرفتن بارگذاری‌های قدیمی هنگام کلیک پشت‌سرهم */
@@ -180,6 +210,7 @@
     if (!licOK(item)) return;                    /* بازبینی دوباره پس از بارگذاری ناهمگام */
     current = { id, def, style, inst: null };
     current.inst = def.mount(view);
+    mountFontCtl(view);
     updTc();
     if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
     markActive();
