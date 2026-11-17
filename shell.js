@@ -32,7 +32,8 @@
     {
       title: 'درباره‌ی برنامه', icon: 'ℹ️', open: true,
       items: [
-        { id: 'changelog', title: 'سابقه‌ی بروزرسانی‌ها', file: 'sims/changelog.js' }
+        { id: 'changelog', title: 'سابقه‌ی بروزرسانی‌ها', file: 'sims/changelog.js' },
+        { id: 'cleardata', title: '🗑 پاک‌کردن داده‌ها و اعتبارها', file: 'sims/cleardata.js' }
       ]
     }
   ];
