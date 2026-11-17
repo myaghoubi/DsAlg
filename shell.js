@@ -13,7 +13,7 @@
       items: [
         { id: 'stack-queue', title: 'شبیه‌ساز صف و پشته', file: 'sims/stack-queue.js' },
         { id: 'graph-traversal', title: 'شبیه‌ساز پیمایش عمقی و سطحی گراف (DFS / BFS)', file: 'sims/graph-traversal.js', deps: ['lib/stepper.js'] },
-        { id: 'avl', title: 'شبیه‌ساز درج و حذف در درخت AVL', file: 'sims/avl.js', deps: ['lib/stepper.js'] }
+        { id: 'avl', title: 'شبیه‌ساز درج و حذف در درخت AVL', file: 'sims/avl.js', deps: ['lib/stepper.js', 'lib/minipy.js'] }
       ]
     },
     {
