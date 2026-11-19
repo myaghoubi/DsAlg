@@ -247,15 +247,12 @@ pre#code{max-height:46vh;overflow-y:auto}
 .ic{width:1.15em;height:1.15em;vertical-align:-.2em;flex:none;display:inline-block}
 .btn .ic{margin-inline:0 .15em}
 .mi{display:inline-flex;align-items:center;gap:8px;min-width:0}
-.mi .ic{width:18px;height:18px;color:var(--acc);vertical-align:0}
-.m-item.on .mi .ic{color:#fff}
-.m-item.locked .mi .ic{color:var(--mut)}
+.mi .ic{width:18px;height:18px;vertical-align:0}
 .chev .ic{width:16px;height:16px;vertical-align:0}
 .em .ic,em.lk .ic{width:12px;height:12px;vertical-align:-.12em}
 .tg-ic{display:inline-flex;vertical-align:middle;transition:transform .15s}
 .tg-ic.shut{transform:rotate(-90deg)}
 .btn.icon .ic{width:20px;height:20px;margin:0}
-.act h2 .ic,.lic-h .ic{color:var(--acc)}
 .btns .btn .ic{width:1em;height:1em;margin:0;vertical-align:-.15em}
 @media (max-width:480px){.btns{gap:3px}.btns .btn{padding-left:4px;padding-right:4px}.btns .btn .ic{width:.9em;height:.9em}}
 .btns .btn{white-space:nowrap;flex:none}
