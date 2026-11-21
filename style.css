@@ -49,7 +49,7 @@ h1 small{display:block;font-size:11px;color:var(--mut);font-weight:400}
 .seg button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .seg button:disabled,.btn:disabled{opacity:.4;cursor:not-allowed}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
-.btn.sec{background:var(--acc2);border-color:var(--acc2);color:#fff}
+.btn.sec{background:var(--acc2);border-color:var(--acc2);color:#1b2233}
 .btn.hot{--rem:100;border-color:var(--warn);color:var(--tx);font-weight:700;
   background:linear-gradient(var(--warn),var(--warn)) right center/calc(var(--rem)*1%) 100% no-repeat,var(--card);
   transition:background-size .25s ease}
@@ -74,7 +74,7 @@ input[type=text]{width:64px;text-align:center;direction:ltr}
 #ringWrap{display:flex;justify-content:center}
 .tabs{display:flex;gap:6px;margin-bottom:6px}
 .tabs button{border:1px solid var(--bd);background:transparent;padding:1px 10px;border-radius:8px;cursor:pointer;direction:ltr;font-family:var(--mono);font-size:12.5px}
-.tabs button.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
+.tabs button.on{background:var(--acc2);border-color:var(--acc2);color:#1b2233}
 pre.code{margin:0;background:var(--codebg);color:var(--codetx);border-radius:10px;padding:6px 0;overflow-x:auto;direction:ltr;text-align:left;
   font-family:var(--mono);font-size:var(--codefs,12.5px);line-height:1.75}
 .ln{display:block;min-width:100%;width:max-content;padding:0 10px 0 0;white-space:pre;border-right:3px solid transparent;unicode-bidi:plaintext}
