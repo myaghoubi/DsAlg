@@ -4,7 +4,7 @@
 @font-face{font-family:"IRANSans";src:url(fonts/IRANSansWeb_Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
 :root{
   --bg:#f3f5fa;--card:#fff;--tx:#1b2233;--mut:#667089;--bd:#dde3ee;
-  --acc:#2563eb;--acc2:#ca8a04;--warn:#ea580c;--ok:#15803d;--err:#dc2626;
+  --acc:#2563eb;--acc2:#ea6a00;--warn:#ea580c;--ok:#15803d;--err:#dc2626;
   --live:#dbeafe;--dead:#e5e7eb;--flash:#fde047;--node:#fff;--edge:#475569;
   --codebg:#0f172a;--codetx:#e2e8f0;--codehl:rgba(37,99,235,.45);--sb:rgba(102,112,137,.55);
   --fa:"IRANSans","Iran Sans",Tahoma,"Segoe UI",system-ui,sans-serif;
@@ -12,7 +12,7 @@
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#0b1020;--card:#151c30;--tx:#e6eaf5;--mut:#98a2bd;--bd:#27314c;
-    --live:#1e3a6e;--dead:#2a3350;--flash:#a16207;--node:#1c2540;--edge:#9aa6c4;--codebg:#070b17;--sb:rgba(152,162,189,.5);--acc2:#facc15}
+    --live:#1e3a6e;--dead:#2a3350;--flash:#a16207;--node:#1c2540;--edge:#9aa6c4;--codebg:#070b17;--sb:rgba(152,162,189,.5);--acc2:#fb923c}
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -81,7 +81,7 @@ pre.code{margin:0;background:var(--codebg);color:var(--codetx);border-radius:10p
 .ln i{display:inline-block;width:2em;text-align:right;color:#64748b;font-style:normal;margin-right:8px;user-select:none}
 .ln.cur{background:var(--codehl);border-right-color:#60a5fa}
 .iv{color:#5eead4;margin-left:18px;font-weight:600}
-.k{color:#facc15}.s{color:#fca5a5}.n{color:#fcd34d}.c{color:#94a3b8}.f{color:#7dd3fc}
+.k{color:#fb923c}.s{color:#fca5a5}.n{color:#fcd34d}.c{color:#94a3b8}.f{color:#7dd3fc}
 details>summary{cursor:pointer;color:var(--mut);font-size:12px;margin:2px 0 4px}
 details pre.code{margin-bottom:6px}
 /* حالت عمودی: کد بلند در کادر خودش اسکرول می‌شود (تا اسکرول صفحه، تصویر را جابه‌جا نکند) */
