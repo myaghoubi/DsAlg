@@ -1,2 +1,2 @@
 
-self.APP_VERSION = '3.30';
+self.APP_VERSION = '3.31';
