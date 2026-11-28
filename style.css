@@ -190,6 +190,8 @@ pre#code{max-height:46vh;overflow-y:auto}
 .m-course:not(.open) .chev{transform:rotate(90deg)}
 .m-course:not(.open) .m-sub{display:none}
 .m-sub{padding:2px 8px 6px 0;margin-right:14px;border-right:2px solid var(--bd)}
+.m-grp{font-size:11.5px;font-weight:700;color:var(--acc);padding:9px 8px 2px;margin-top:2px;border-top:1px dashed var(--bd)}
+.m-grp:first-child{border-top:0;margin-top:0}
 .m-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:transparent;
   padding:9px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;text-align:right;line-height:1.7}
 .m-item:hover{background:rgba(37,99,235,.08)}
